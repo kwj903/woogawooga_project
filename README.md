@@ -32,7 +32,7 @@
 - "whisperx>=3.4.2",
 - "pyannote-audio",
 - "openai-whisper",
-
+- "pyannote-audio",
 # 작업 폴더 설정
 ## dataset_create 작업 폴더 : 데이터셋 준비하는 작업 폴더
 
