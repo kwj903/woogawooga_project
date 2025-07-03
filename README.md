@@ -25,6 +25,9 @@
 - "torch>=2.7.1",
 - "torchvision>=0.22.1",
 - "xgboost>=3.0.2",
+- "webdriver-manager>=4.0.2",
+- "selenium>=4.34.0",
+- "requests>=2.32.4",
 
 # 작업 폴더 설정
 ## dataset_create 작업 폴더 : 데이터셋 준비하는 작업 폴더
