@@ -29,6 +29,9 @@
 - "torchvision>=0.22.1",
 - "webdriver-manager>=4.0.2",
 - "xgboost>=3.0.2",
+- "whisperx>=3.4.2",
+- "pyannote-audio",
+- "openai-whisper",
 
 # 작업 폴더 설정
 ## dataset_create 작업 폴더 : 데이터셋 준비하는 작업 폴더

@@ -18,9 +18,11 @@ dependencies = [
     "nltk>=3.9.1",
     "notebook>=7.4.4",
     "numpy>=2.2.6",
+    "openai-whisper",
     "opencv-contrib-python>=4.11.0.86",
     "pandas>=2.3.0",
     "pinecone-client>=6.0.0",
+    "pyannote-audio",
     "python-dotenv>=1.1.1",
     "requests>=2.32.4",
     "scikit-learn>=1.7.0",
@@ -30,5 +32,9 @@ dependencies = [
     "torch>=2.7.1",
     "torchvision>=0.22.1",
     "webdriver-manager>=4.0.2",
+    "whisperx>=3.4.2",
     "xgboost>=3.0.2",
 ]
+
+[tool.uv.sources]
+openai-whisper = { git = "https://github.com/openai/whisper.git" }
