@@ -38,3 +38,4 @@ dependencies = [
 
 [tool.uv.sources]
 openai-whisper = { git = "https://github.com/openai/whisper.git" }
+whisperx = { git = "https://github.com/m-bain/whisperX.git" }
