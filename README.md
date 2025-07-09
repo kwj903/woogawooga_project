@@ -16,9 +16,11 @@
 - "nltk>=3.9.1",
 - "notebook>=7.4.4",
 - "numpy>=2.2.6",
+- "openai-whisper",
 - "opencv-contrib-python>=4.11.0.86",
 - "pandas>=2.3.0",
 - "pinecone-client>=6.0.0",
+- "pyannote-audio",
 - "python-dotenv>=1.1.1",
 - "requests>=2.32.4",
 - "scikit-learn>=1.7.0",
@@ -28,11 +30,8 @@
 - "torch>=2.7.1",
 - "torchvision>=0.22.1",
 - "webdriver-manager>=4.0.2",
-- "xgboost>=3.0.2",
 - "whisperx>=3.4.2",
-- "pyannote-audio",
-- "openai-whisper",
-- "pyannote-audio",
+- "xgboost>=3.0.2",
 # 작업 폴더 설정
 ## dataset_create 작업 폴더 : 데이터셋 준비하는 작업 폴더
 
