@@ -8,6 +8,7 @@ dependencies = [
     "ipykernel>=6.29.5",
     "jpype1>=1.5.2",
     "jupyterlab>=4.4.4",
+    "kiwipiepy>=0.21.0",
     "konlpy>=0.6.0",
     "koreanize-matplotlib>=0.1.1",
     "langchain>=0.3.26",
@@ -33,5 +34,6 @@ dependencies = [
     "torchvision>=0.22.1",
     "webdriver-manager>=4.0.2",
     "whisperx>=3.4.2",
+    "wordcloud>=1.9.4",
     "xgboost>=3.0.2",
 ]
