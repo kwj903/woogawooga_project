@@ -1829,6 +1829,45 @@ wheels = [
 ]
 
 [[package]]
+name = "kiwipiepy"
+version = "0.21.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "kiwipiepy-model" },
+    { name = "numpy" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d0/a7/1ff70232329174e3ad902550b18ced789804b8e1d5adfb05eaffee828024/kiwipiepy-0.21.0.tar.gz", hash = "sha256:f94b774987fb789ffaa157d49d1710cde2f1330882e8da4b1518a6929ef91089", size = 3598558 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1d/e4/3c5566b46ad3b44d36de7404de0eed73754bf34aa375b96a64f0cc2f6906/kiwipiepy-0.21.0-cp310-cp310-macosx_13_0_arm64.whl", hash = "sha256:655589a3fc20f2e902e9d4f62e5918d8ac02748f8e1f877d416c7b570edb4ead", size = 4598779 },
+    { url = "https://files.pythonhosted.org/packages/27/9e/ba37993c32232b9cfe8bbea02af332acc835731d90bb122a6846830af9c2/kiwipiepy-0.21.0-cp310-cp310-macosx_13_0_x86_64.whl", hash = "sha256:34cb9d079eb2ec28626ebac28e3d2132028cd6b6b792d1e24b05c52bce91ee99", size = 11605383 },
+    { url = "https://files.pythonhosted.org/packages/29/79/34241228198c3cccbbc472223015ea345345537bd592bd49199d63bb5a4d/kiwipiepy-0.21.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d334f953c37ec1d5d335ae76ab2463459d25c385b559c90f8a48354bce61ed7e", size = 7623532 },
+    { url = "https://files.pythonhosted.org/packages/28/6e/33134f3628681dd74f907fe24769d74381af4238f3cf18a5160b06e4cb31/kiwipiepy-0.21.0-cp310-cp310-win32.whl", hash = "sha256:3c6aaec33720d3681a907ebb9534fa2e5be0bcc9d610e1e0204375d427ac58f7", size = 1485539 },
+    { url = "https://files.pythonhosted.org/packages/d5/f3/1f9d426f7387457c505688b9e952ccdb6b4784e5eb4f20bcdd3ae7de56d1/kiwipiepy-0.21.0-cp310-cp310-win_amd64.whl", hash = "sha256:369813833aadfc73de7c9d8ae992e2a590d0cfa546bf6827bcdf4e98a81df812", size = 2418322 },
+    { url = "https://files.pythonhosted.org/packages/bb/74/35c41a42c3fcb60ee28a91ea927c2a136c5e066044c0458e117a68da7edf/kiwipiepy-0.21.0-cp311-cp311-macosx_10_14_x86_64.whl", hash = "sha256:70ae9842fc9882a84b0ba3b8a39f64bba9d52f57d04c9a574fbfc4f04e77dd34", size = 11605387 },
+    { url = "https://files.pythonhosted.org/packages/db/4b/d6e3f8fcc844ed31c063311d386598fd2ae55d43f4ed738e0b0f2335b0ad/kiwipiepy-0.21.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:ee09a0c8f7e054b2350d8009837ad042dbfe925ce38912574aeb1399a959b468", size = 4598759 },
+    { url = "https://files.pythonhosted.org/packages/7b/b4/d4d9cf0df0e6dc2e2fd7ded472e1a09ff55d52b5738c616c603996626062/kiwipiepy-0.21.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5fcc057b24210f9ce26834c61ff6bba461bdffcb433acba40dc0e338319f947e", size = 7623110 },
+    { url = "https://files.pythonhosted.org/packages/9f/15/1c7ec5d787c58e95ec96d008ea9c08af702c818c3a863c990f512051cba5/kiwipiepy-0.21.0-cp311-cp311-win32.whl", hash = "sha256:52ce5392c4e79bdad8bfc6d1288570cf6c9759b81de2a9c04f82b685707d658f", size = 1485822 },
+    { url = "https://files.pythonhosted.org/packages/3c/99/81a27e230b87643cbf7606f762c2d2562e660f746dd71424480a6634c54a/kiwipiepy-0.21.0-cp311-cp311-win_amd64.whl", hash = "sha256:474f39db53fa1af9aac175c782ffdf864460c01354c85527b3b60a7372c5e203", size = 2417395 },
+    { url = "https://files.pythonhosted.org/packages/30/ad/de32a639a4aed25b492e8921ff9850aa7b9e80351002947eaf35bb46321d/kiwipiepy-0.21.0-cp312-cp312-macosx_10_14_x86_64.whl", hash = "sha256:3c095c2e425c843d1deec9a18a2834ce91edf6be19d9da94467e8005b9ead2a6", size = 11608513 },
+    { url = "https://files.pythonhosted.org/packages/86/c7/60642e2f4173e9b8d96f66ac01e279143aea333c0b865d3a9a8f3681a053/kiwipiepy-0.21.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:78f11c14bb33ee21e011b7cef76d1f56e2416d734fd9efee80acf1a4c599cdcc", size = 4600032 },
+    { url = "https://files.pythonhosted.org/packages/fa/bf/4a361f687dce5eccc748b545358561d2f8defff00ce769828fe88e05acb0/kiwipiepy-0.21.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1b41ff34b43ccd9c79867b77689b1b882ffc5e7f9bb0e2f1e1139bf56254ea07", size = 7623449 },
+    { url = "https://files.pythonhosted.org/packages/ca/75/a41190c43749f1ab4c8a10b5401c9db8158dd6138b0c38029d187f08ca7e/kiwipiepy-0.21.0-cp312-cp312-win32.whl", hash = "sha256:bf3832cb0ca6524a49b127340779c3792ab8c42d0890033be2f407abe1e1d04f", size = 1487025 },
+    { url = "https://files.pythonhosted.org/packages/91/03/877279804c4193f95cff90bc94927b7cf1b90ef69b6bcce2dcc87956fe16/kiwipiepy-0.21.0-cp312-cp312-win_amd64.whl", hash = "sha256:7c2c1b29642b84ee48b729c841dcfcfcfe55b28b5e32b7497f303c710ed8750c", size = 2418539 },
+    { url = "https://files.pythonhosted.org/packages/92/b9/059bfa8a324aa74e331416e4c7db508f9b895ee222110102dec7378a5a9f/kiwipiepy-0.21.0-cp313-cp313-macosx_10_14_x86_64.whl", hash = "sha256:f6ae4e7bb3eef52cc1d692e4ea8880c2b8ff65129ae860ccbb5371d0464b7140", size = 11608513 },
+    { url = "https://files.pythonhosted.org/packages/62/f0/3f3a22cf19eb1a4dc9e0ca14484144f7ae92e8647e9fe0f1177adaedfaa2/kiwipiepy-0.21.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:43fc3e750f8dfe999d2d2c9dfce1a4a19a893d4849397c1c95412f7ee4adf25b", size = 4600036 },
+    { url = "https://files.pythonhosted.org/packages/f2/9d/3f179f918c07aeeb1bb8fdb013725d7c6337fc23e397f8b3dde742b46bdb/kiwipiepy-0.21.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ea85c395589be5916e679db2288e551b796af9f13460510d5d9b15e60ef6e30f", size = 7623443 },
+    { url = "https://files.pythonhosted.org/packages/ac/d0/6cbbba112d68ec790a91f10189cb9007b105dc9ca81459b31071328f4381/kiwipiepy-0.21.0-cp313-cp313-win32.whl", hash = "sha256:6b2203d25d139cf363963bd4aaefd6612bb285b3019a0273c11dd6cecd2eba35", size = 1487033 },
+    { url = "https://files.pythonhosted.org/packages/23/1f/510c273f0e455fdab206d2d63ea8892400bec3911297261637b807d1d302/kiwipiepy-0.21.0-cp313-cp313-win_amd64.whl", hash = "sha256:d6b72b1874a5adbbcf826054a6f638d671c71fd3be00fe7942332790e3da9e01", size = 2418467 },
+]
+
+[[package]]
+name = "kiwipiepy-model"
+version = "0.21.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/06/1b/9bded3c32a52abd34cf4fe236afed4849ebbb2ab3e2b5b495d450e6be311/kiwipiepy_model-0.21.0.tar.gz", hash = "sha256:046fd96bfc1d7487fc8f0eebf0b8e7f24c5c41e1ff2fb4a72ae77e9f9ca2d459", size = 35481174 }
+
+[[package]]
 name = "kiwisolver"
 version = "1.4.8"
 source = { registry = "https://pypi.org/simple" }
@@ -5568,6 +5607,7 @@ dependencies = [
     { name = "ipykernel" },
     { name = "jpype1" },
     { name = "jupyterlab" },
+    { name = "kiwipiepy" },
     { name = "konlpy" },
     { name = "koreanize-matplotlib" },
     { name = "langchain" },
@@ -5594,6 +5634,7 @@ dependencies = [
     { name = "torchvision" },
     { name = "webdriver-manager" },
     { name = "whisperx" },
+    { name = "wordcloud" },
     { name = "xgboost" },
 ]
 
@@ -5604,6 +5645,7 @@ requires-dist = [
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "jpype1", specifier = ">=1.5.2" },
     { name = "jupyterlab", specifier = ">=4.4.4" },
+    { name = "kiwipiepy", specifier = ">=0.21.0" },
     { name = "konlpy", specifier = ">=0.6.0" },
     { name = "koreanize-matplotlib", specifier = ">=0.1.1" },
     { name = "langchain", specifier = ">=0.3.26" },
@@ -5629,7 +5671,57 @@ requires-dist = [
     { name = "torchvision", specifier = ">=0.22.1" },
     { name = "webdriver-manager", specifier = ">=4.0.2" },
     { name = "whisperx", specifier = ">=3.4.2" },
+    { name = "wordcloud", specifier = ">=1.9.4" },
     { name = "xgboost", specifier = ">=3.0.2" },
+]
+
+[[package]]
+name = "wordcloud"
+version = "1.9.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/03/a1/0530b9001b05dcd13de21c2d4d821db5365dade5180242179fbc39372c57/wordcloud-1.9.4.tar.gz", hash = "sha256:b273d8a5ded97d3ead904046b49464dcb71119ee79df875072a4c105cadd347a", size = 27563753 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8a/b0/21ab9282e5922ccd23b67050151476a4a32a7678d59bad4aa46534615afa/wordcloud-1.9.4-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:61a84e7311fce8415943edcb7b2ba65b4bfec1dc6dff8fe5a8ea76e278447fb2", size = 171753 },
+    { url = "https://files.pythonhosted.org/packages/54/e5/7969f3b4a58bd4ac19e60e86f6a23925c19416ec065725b530f40c692e0e/wordcloud-1.9.4-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:8e8752750726f31385f364823d3ef1d9c8ec829e5c07706c36beb40679945c71", size = 167716 },
+    { url = "https://files.pythonhosted.org/packages/dc/2a/a6d5c03decbe145858e777e80dbbf92697da9728c9d0c71c1c81a2d68e35/wordcloud-1.9.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:990dfd6dd43a1c7fa156be865eb98aba167a986b65f56cbf50e24772107fcd70", size = 511106 },
+    { url = "https://files.pythonhosted.org/packages/e2/1e/663284794aedbaeb58939d3df391725de6d3966d4f742f6ff37ae7181a1b/wordcloud-1.9.4-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:a70fe8999cd63aec64daa0377b720be6e5ff344963b828caeb4c2a081599a3a0", size = 493431 },
+    { url = "https://files.pythonhosted.org/packages/2f/76/971e2689430555fb1a04f148a4888f0b4d20873f19d1e04c02ff1e613b60/wordcloud-1.9.4-cp310-cp310-musllinux_1_2_i686.whl", hash = "sha256:37dcd5500cc2ea02950739390e89e2efa6624c2f54b5e2df1ee961fce685b2d7", size = 514561 },
+    { url = "https://files.pythonhosted.org/packages/76/40/eb530e49348f8acac2351843f886f74ea6f17e99c349aad6d583029d60f7/wordcloud-1.9.4-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:f5cc5c902dc2492b9fc0e29a1f5c688422d7e6eb9e5c0e43f0331d1c8e1341ba", size = 530938 },
+    { url = "https://files.pythonhosted.org/packages/c5/56/ac3d6bab585ac2a9fc7d3aec4f25832188ad1d7d81815dbca9e7017709e6/wordcloud-1.9.4-cp310-cp310-win32.whl", hash = "sha256:c20fbb51af2046c940b4fead4bafffc30b4191f5fb477c3af844446d8956bfd4", size = 289958 },
+    { url = "https://files.pythonhosted.org/packages/79/59/7a85f2be948999e16b88574cc8341524a4042b4544d1904b08a652f7f415/wordcloud-1.9.4-cp310-cp310-win_amd64.whl", hash = "sha256:61a153e76d73c72f5cc6c89ee80ddad70758a207c3c6b1d86be8635ec70164f1", size = 299767 },
+    { url = "https://files.pythonhosted.org/packages/32/07/3d355f71fb32f9d780d0099ece83dd10f0b9b71a9359cd468f3c25c52bfc/wordcloud-1.9.4-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:af168eeaed67a675f35b5668a7804c4d64f8e4f62a273b909eb5cc39efc4c294", size = 171653 },
+    { url = "https://files.pythonhosted.org/packages/fa/5f/34a0c0be52dc95f96aa1197f03ad5d5c58a9901c74f050d21a3e1b21ebf9/wordcloud-1.9.4-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:3092bf85cb20158c8b90d78650dc0226985109ac6fe13a0086ac47b9581b62ce", size = 167608 },
+    { url = "https://files.pythonhosted.org/packages/ee/d3/67ccdab9d2756f8b30b0669015840cd5fdb5f062a2d621d67f033cf3dd54/wordcloud-1.9.4-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ddfb852f551681f5e33feb934505e060952b6aa98aaa48c781cdbf101f84e7cc", size = 547933 },
+    { url = "https://files.pythonhosted.org/packages/9b/a5/44f374424cceab8db931ea4bf48a78d9969e5fd3e6c47d84d0e2276c0bd6/wordcloud-1.9.4-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:57ad8064a634a4870fcd00a9694c0a7839c6dfbac3d32522c69d5e1e9cbfd911", size = 528539 },
+    { url = "https://files.pythonhosted.org/packages/fc/5f/2ab2ce735e4dc8775888ddb2fb12c91d2a4208cffb5861a49b3191da74e9/wordcloud-1.9.4-cp311-cp311-musllinux_1_2_i686.whl", hash = "sha256:ea14858973ad8561a20a5475eb8d7ad33622bc5f27c60206fbb3e10a036cee26", size = 548667 },
+    { url = "https://files.pythonhosted.org/packages/94/3e/54fc6d268dc6404d878b2e49a587b6f92440d08cb5d6bb6b8f1b575efef3/wordcloud-1.9.4-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:b27759f12dd235468ff8c1df875b106b23dbf2c74aae05cdcdc3ccd8e23ea89c", size = 567875 },
+    { url = "https://files.pythonhosted.org/packages/28/a7/ca3e02c86080332c3af55c581ba0a79c4c25b12bc49fcd2bbbbeeec7a490/wordcloud-1.9.4-cp311-cp311-win32.whl", hash = "sha256:0ac3d87627022fb8cce17297298be96c91185edd55ecf8906f89f981b55974f0", size = 289607 },
+    { url = "https://files.pythonhosted.org/packages/00/09/abb305dce85911b8fba382926cfc57f2f257729e25937fdcc63f3a1a67f9/wordcloud-1.9.4-cp311-cp311-win_amd64.whl", hash = "sha256:85368249df056527f1b64e80e68636abb61f0f6bd2d1c430894d2af1feea7f73", size = 299928 },
+    { url = "https://files.pythonhosted.org/packages/3d/5d/b51a970694ca5feda24cec7dbd37a63bcecd3e5735386840b0ed883bd3df/wordcloud-1.9.4-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:3910494ce5acb27731fd5678d146e8aa8f588d5fdb455810c817ff4b84ee0f67", size = 173370 },
+    { url = "https://files.pythonhosted.org/packages/c4/07/1a82829127bbf4f9d46de5c6009b7c095a450fa8f0fb466f788a62eeae11/wordcloud-1.9.4-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:1b1c29a0089ee90778700cc96305fa830a6a5bbb342eaaa59d6ac8d37a9b232f", size = 168868 },
+    { url = "https://files.pythonhosted.org/packages/af/ad/9ec4ded660b95c265ec4de2688ac1d0940bb06e609193c200853ba0e7db6/wordcloud-1.9.4-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f369ae7bef16341c2bb208e658d5e4c56517046eb6176f89ac95525eaf8ace09", size = 539171 },
+    { url = "https://files.pythonhosted.org/packages/49/ef/a9aad2400d5f68fca8efd6b75fb5067b7c91abcf9f9cfd5cc4cd3dc955ba/wordcloud-1.9.4-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:9ec6ffba61ca20123e7c09103a5692bbc3163f75ee0bdc7893e80e0e2786ccd2", size = 518450 },
+    { url = "https://files.pythonhosted.org/packages/d1/b0/320b69ad1976a351649e778ccc1d899791010661736179614434f5229cdf/wordcloud-1.9.4-cp312-cp312-musllinux_1_2_i686.whl", hash = "sha256:cdc4aac2bcce77fd91dbfe91db5a8c0cdc239e10d8954356d2ebf79a3b43646c", size = 542195 },
+    { url = "https://files.pythonhosted.org/packages/7d/db/c9c3f2d6e1af3f8b2488da4d14d731ecaf8ba990bdaed1d0f9e3f9c6aa5e/wordcloud-1.9.4-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:e4942fbed48a88a0c42c5b0a057651fc09d26b31be8b6c069adaaa5051836040", size = 559512 },
+    { url = "https://files.pythonhosted.org/packages/b3/be/307b2ba29f9502ea2fa5f8553d1674f0b811cc97f6d4f88a5ef374f91a75/wordcloud-1.9.4-cp312-cp312-win32.whl", hash = "sha256:96b801fe4b2aa39bb6c5e68b4a74c81fd8996dd5fb5cea31fda518dc5f77ad82", size = 291061 },
+    { url = "https://files.pythonhosted.org/packages/b9/74/6a15f68f59bc90032bfcf62eca796a5675be95e1aaf84f7861e1bfcfa8e5/wordcloud-1.9.4-cp312-cp312-win_amd64.whl", hash = "sha256:360977705d0808a1795fcbe98afb5dc4833cb4bb8e421cbb10e93ef0bce816ff", size = 301186 },
+    { url = "https://files.pythonhosted.org/packages/12/63/b9ae330ea5ce8cb1fd363290e39acd3440d66a111e22a388c71327dbfdd7/wordcloud-1.9.4-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:88c4c99f43b13df0e812fac0e4680cca2afd3ce16ade506812127ed7c7b9d132", size = 172336 },
+    { url = "https://files.pythonhosted.org/packages/d2/81/f09fb4cd8a24abec8bbc86465dfaecea9f5f30dfe0936816fe7c0199b965/wordcloud-1.9.4-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:2367ec70b2f195c278f91caf4674871ee9218eb57250e01a02b986d34e55f88e", size = 167649 },
+    { url = "https://files.pythonhosted.org/packages/1a/f0/81624a86d570e2c72336b139be19923eeb35db584a5409fa0bb7077de506/wordcloud-1.9.4-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d6104a52936886dbc785844ab6986b5321a312238abb242ee4062c7b3fdcca7c", size = 537246 },
+    { url = "https://files.pythonhosted.org/packages/9e/1d/dab7bfdd2fe4878b2bc36212ceab7392742278fd5970d281680fbbfebc95/wordcloud-1.9.4-cp313-cp313-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:81bbe75b2725730bf5cbabfe86a5c38960e7ce1166f76ba7001964d8de50b3a7", size = 513149 },
+    { url = "https://files.pythonhosted.org/packages/db/9b/27cd55561c615057931df10c399ab7976d89a79134f3e6a895c4fde33e0b/wordcloud-1.9.4-cp313-cp313-musllinux_1_2_i686.whl", hash = "sha256:a936b8e03c32cc84c99ad8f1bdaf261dfef6c44d31ca5b0c7d0df147220dbb3c", size = 538723 },
+    { url = "https://files.pythonhosted.org/packages/9f/9e/8d3cade7d9f18a8e406e3e9d701e721d1e41d1ac15bf292e71c817545a59/wordcloud-1.9.4-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:046300566df97b48640bd3efd94957a56941ada98cc23f811bc3f9b6a0ac1350", size = 555877 },
+    { url = "https://files.pythonhosted.org/packages/1d/d8/bdaf902471c3f0cc3538c8183cdd0ac61624c9552e5414d8d78ddedb6ce8/wordcloud-1.9.4-cp313-cp313-win32.whl", hash = "sha256:22357990a01d87579dbd38a06c2a5c7b601179c4e17517b1b8f73d25faa6a5ed", size = 290877 },
+    { url = "https://files.pythonhosted.org/packages/84/47/d482f7d2decc6e59e69e105b12c53d6d2967f0d703e664484c5f2f87fca8/wordcloud-1.9.4-cp313-cp313-win_amd64.whl", hash = "sha256:8c9a5af2fbcf029a19e827adbee58e86efe7536dca7a42380a8601113a86069b", size = 300987 },
+    { url = "https://files.pythonhosted.org/packages/63/6b/886a158a7ccc9c4c0a5ff2f3d45623b66da1af73c75584bc25113dff5e36/wordcloud-1.9.4-pp310-pypy310_pp73-macosx_10_15_x86_64.whl", hash = "sha256:f733cca468eae79af83cdda1de2434f1799cefef461ed892e7679d5a4c929fa1", size = 157970 },
+    { url = "https://files.pythonhosted.org/packages/4d/c5/180698e0f0e6bb42b3a173ce47d0474649dfcfa9bd60c902609e5707fde6/wordcloud-1.9.4-pp310-pypy310_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3a99f96efe5983c6eed17abb8766ced713ddf18b26450da74addc91570922e62", size = 171923 },
+    { url = "https://files.pythonhosted.org/packages/a2/b9/94ca10d94b6f64ab55a7bacc3d9e30df339a8d3607d1919099d12da12024/wordcloud-1.9.4-pp310-pypy310_pp73-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:80773ec6a9caa2048602bc347151e3b6e68e1d8fab148dfd0d2e7d4302ce5c01", size = 172780 },
+    { url = "https://files.pythonhosted.org/packages/e6/ed/35af241d0243ed82f5231a4e4dbabfdb421fba2b64fd4bdd66b413ad5c04/wordcloud-1.9.4-pp310-pypy310_pp73-win_amd64.whl", hash = "sha256:ca95392bba150190cca8df4a97854b554bdeb28007f28bf4698bd7e1af91b310", size = 295073 },
 ]
 
 [[package]]
