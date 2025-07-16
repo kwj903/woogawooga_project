@@ -5,7 +5,7 @@
 # GEMINI 파일은 버전 관리 제외
 GEMINI.md
 
-# dataset,datas 폴더 안 내용물 제외 (폴더는 유지)
+# dataset, datas, models 폴더 안 내용물 제외 (폴더는 유지)
 dataset/*
 !dataset/.gitkeep
 datas/*
