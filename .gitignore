@@ -12,3 +12,4 @@ datas/*
 !datas/.gitkeep
 models/*
 !models/.gitkeep
+.gemini/*
