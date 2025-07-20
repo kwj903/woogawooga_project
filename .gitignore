@@ -13,3 +13,5 @@ datas/*
 models/*
 !models/.gitkeep
 .gemini/*
+# 클로드 마크다운
+CLAUDE.md

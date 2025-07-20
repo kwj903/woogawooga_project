@@ -2,7 +2,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
-from wordcloud import WordCloud
 
 # 파일 경로 (원하는 경로로 수정 가능)
 # file_path = "../../dataset/phishing_6000_final.csv"
@@ -48,20 +47,7 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_dir, "char_count_boxplot.png"))
 plt.close()
 
-# 워드클라우드 생성
-all_text = " ".join(grouped["text"])
-wordcloud = WordCloud(
-    font_path="malgun.ttf", width=800, height=400, background_color="white"
-).generate(all_text)
-plt.figure(figsize=(10, 5))
-plt.imshow(wordcloud, interpolation="bilinear")
-plt.axis("off")
-plt.tight_layout()
-plt.savefig(os.path.join(output_dir, "wordcloud.png"))
-plt.close()
-
 print("✅ 분석 완료! 결과 파일:")
-print(f"- 통계 요약: {output_dir}\\char_count_summary.txt")
-print(f"- 히스토그램: {output_dir}\\char_count_histogram.png")
-print(f"- 박스플롯: {output_dir}\\char_count_boxplot.png")
-print(f"- 워드클라우드: {output_dir}\\wordcloud.png")
+print(f"- 통계 요약: {output_dir}\char_count_summary.txt")
+print(f"- 히스토그램: {output_dir}\char_count_histogram.png")
+print(f"- 박스플롯: {output_dir}\char_count_boxplot.png")
