@@ -3,9 +3,12 @@
 
 # 현재 설치한 라이브러리 : 
 - requires-python = ">=3.10"
+- "google-genai>=1.24.0",
+- "google-generativeai>=0.8.5",
 - "ipykernel>=6.29.5",
 - "jpype1>=1.5.2",
 - "jupyterlab>=4.4.4",
+- "kiwipiepy>=0.21.0",
 - "konlpy>=0.6.0",
 - "koreanize-matplotlib>=0.1.1",
 - "langchain>=0.3.26",
@@ -31,6 +34,7 @@
 - "torchvision>=0.22.1",
 - "webdriver-manager>=4.0.2",
 - "whisperx>=3.4.2",
+- "wordcloud>=1.9.4",
 - "xgboost>=3.0.2",
 # 작업 폴더 설정
 ## dataset_create 작업 폴더 : 데이터셋 준비하는 작업 폴더
