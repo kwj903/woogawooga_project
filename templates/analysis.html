@@ -1,0 +1,127 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>분석 진행중 - 보이스피싱 탐지 시스템</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- 네비게이션 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-content">
+                <a href="{% url 'woogawooga:index' %}" class="nav-logo">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>보이스피싱 판단 시스템</span>
+                </a>
+                
+                <div class="nav-menu desktop-menu">
+                    <a href="{% url 'woogawooga:index' %}" class="nav-link">홈</a>
+                    <a href="{% url 'woogawooga:upload' %}" class="nav-link">업로드</a>
+                </div>
+                
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+            
+            <div class="mobile-menu" id="mobileMenu">
+                <a href="{% url 'woogawooga:index' %}" class="mobile-nav-link">홈</a>
+                <a href="{% url 'woogawooga:upload' %}" class="mobile-nav-link">업로드</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 메인 콘텐츠 -->
+    <main class="main-content">
+        <div class="container analysis-container">
+            <!-- 헤더 -->
+            <div class="page-header">
+                <h1>분석 진행중...</h1>
+                <p class="task-id">작업 ID: <span id="taskId">{{ task_id|default:'TASK-2024-001' }}</span></p>
+            </div>
+
+            <!-- 분석 카드 -->
+            <div class="card analysis-card">
+                <div class="card-header">
+                    <h3 class="card-title">보이스피싱 분석</h3>
+                    <p class="card-description">1차 2차 연동 탐지를 통한 정확한 분석을 진행합니다</p>
+                </div>
+                
+                <div class="card-content">
+                    <!-- 분석 단계 -->
+                    <div class="analysis-steps" id="analysisSteps">
+                        <div class="analysis-step" data-step="stt">
+                            <div class="step-icon">
+                                <i class="fas fa-circle step-pending"></i>
+                            </div>
+                            <div class="step-content">
+                                <span class="step-name">STT 변환</span>
+                                <div class="step-progress">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 0%"></div>
+                                    </div>
+                                    <span class="progress-percent">0%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analysis-step" data-step="ml">
+                            <div class="step-icon">
+                                <i class="fas fa-circle step-pending"></i>
+                            </div>
+                            <div class="step-content">
+                                <span class="step-name">1차 ML 분석</span>
+                                <div class="step-progress">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 0%"></div>
+                                    </div>
+                                    <span class="progress-percent">0%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analysis-step" data-step="dl">
+                            <div class="step-icon">
+                                <i class="fas fa-circle step-pending"></i>
+                            </div>
+                            <div class="step-content">
+                                <span class="step-name">2차 DL 분석</span>
+                                <div class="step-progress">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 0%"></div>
+                                    </div>
+                                    <span class="progress-percent">0%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 현재 상태 메시지 -->
+                    <div class="status-box">
+                        <p class="status-message" id="currentStatus">분석을 시작합니다...</p>
+                    </div>
+
+                    <!-- 오류 시 재시도 버튼 -->
+                    <div class="error-section" id="errorSection" style="display: none;">
+                        <div class="error-message">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>분석 실패시 재시도</p>
+                        </div>
+                        <button class="btn btn-outline" onclick="retryAnalysis()">
+                            <i class="fas fa-redo"></i>
+                            다시 시도
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="{% static 'js/script.js' %}"></script>
+    <script src="{% static 'js/analysis.js' %}"></script>
+</body>
+</html>
