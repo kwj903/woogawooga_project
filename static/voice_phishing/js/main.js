@@ -28,7 +28,11 @@ class VoicePhishingDetector {
     }
 
     // 터치 디바이스에서는 드래그 앤 드롭 대신 클릭으로 파일 선택
-    dropZone.addEventListener("click", () => {
+    dropZone.addEventListener("click", (e) => {
+      // 라벨 클릭 시 중복 방지 (라벨 자체에서도 파일 입력이 열림)
+      if (e.target.tagName === 'LABEL') {
+        return
+      }
       fileInput.click()
     })
 
@@ -99,6 +103,13 @@ class VoicePhishingDetector {
     const file = e.target.files[0]
     if (file) {
       console.log("파일 선택됨:", file.name, "크기:", file.size, "타입:", file.type)
+      
+      // 이미 같은 파일이 선택되어 있으면 중복 처리 방지
+      if (this.selectedFile && this.selectedFile.name === file.name && this.selectedFile.size === file.size) {
+        console.log("동일한 파일이 이미 선택되어 있습니다.")
+        return
+      }
+      
       this.handleFile(file)
     } else {
       console.log("파일 선택이 취소되었습니다.")
@@ -142,7 +153,17 @@ class VoicePhishingDetector {
   }
 
   enableAnalyzeButton() {
-    document.getElementById("analyze-btn").disabled = false
+    const analyzeBtn = document.getElementById("analyze-btn")
+    analyzeBtn.disabled = false
+    analyzeBtn.classList.remove('processing')
+    analyzeBtn.textContent = '분석 시작'
+  }
+
+  resetAnalyzeButton() {
+    const analyzeBtn = document.getElementById("analyze-btn")
+    analyzeBtn.disabled = false
+    analyzeBtn.classList.remove('processing')
+    analyzeBtn.textContent = '분석 시작'
   }
 
   async startAnalysis() {
@@ -151,6 +172,17 @@ class VoicePhishingDetector {
       alert("파일을 업로드해주세요.")
       return
     }
+
+    // 중복 실행 방지
+    const analyzeBtn = document.getElementById("analyze-btn")
+    if (analyzeBtn.disabled || analyzeBtn.classList.contains('processing')) {
+      return
+    }
+
+    // 버튼 비활성화로 중복 실행 방지
+    analyzeBtn.disabled = true
+    analyzeBtn.classList.add('processing')
+    analyzeBtn.textContent = '분석 중...'
 
     this.showScreen("analysis")
 
@@ -186,6 +218,9 @@ class VoicePhishingDetector {
     } catch (error) {
       console.error("Analysis error:", error)
       this.showError("네트워크 오류가 발생했습니다. 다시 시도해주세요.")
+    } finally {
+      // 분석 완료 후 버튼 상태 복원
+      this.resetAnalyzeButton()
     }
   }
 
@@ -470,8 +505,14 @@ class VoicePhishingDetector {
   resetToUpload() {
     this.selectedFile = null
     document.getElementById("file-selected").classList.add("hidden")
-    document.getElementById("analyze-btn").disabled = true
     document.getElementById("file-input").value = ""
+    
+    // 버튼 상태 완전히 초기화
+    const analyzeBtn = document.getElementById("analyze-btn")
+    analyzeBtn.disabled = true
+    analyzeBtn.classList.remove('processing')
+    analyzeBtn.textContent = '분석 시작'
+    
     this.showScreen("upload")
   }
 

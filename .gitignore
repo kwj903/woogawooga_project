@@ -31,3 +31,6 @@ local_settings.py
 .DS_store
 *.bak
 *.swp
+.claude/*
+.vscode/*
+
