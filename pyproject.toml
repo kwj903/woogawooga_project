@@ -24,7 +24,7 @@ dependencies = [
     "nltk>=3.9.1",
     "notebook>=7.4.4",
     "numpy>=2.2.6",
-    "openai-whisper",
+    "whisper==1.1.10",
     "opencv-contrib-python>=4.11.0.86",
     "pandas>=2.3.0",
     "pinecone-client>=6.0.0",

@@ -1,0 +1,152 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>woogawooga</title>
+    <link rel="stylesheet" href="{% static 'voice_phishing/css/style.css' %}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <svg class="shield-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                </svg>
+                <h1 class="header-title">woogawooga</h1>
+            </div>
+            <div class="breadcrumb">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                </svg>
+                <span id="breadcrumb-text">업로드</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Upload Screen -->
+            <div id="upload-screen" class="card">
+                <div class="card-header">
+                    <h2 class="card-title">woogawooga</h2>
+                    <p class="card-description">음성 파일 업로드</p>
+                </div>
+                <div class="card-content">
+                    <div class="upload-section">
+                        <div class="section-header">
+                            <svg class="file-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                            </svg>
+                            <span class="section-title">음성 파일 업로드</span>
+                        </div>
+                        <p class="file-formats">※ 지원 포맷: AMR, MP3, WAV, M4A</p>
+                        
+                        <form id="upload-form" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div id="drop-zone" class="drop-zone">
+                                <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                </svg>
+                                <p class="drop-text">파일을 선택하거나 여기에 드래그하세요</p>
+                                <input type="file" id="file-input" name="audio_file" class="file-input" accept=".mp3,.wav,.amr,.m4a,audio/*">
+                                <label for="file-input" class="btn btn-outline">파일 선택</label>
+                            </div>
+                        </form>
+                        
+                        <div id="file-selected" class="file-selected hidden">
+                            <p class="file-selected-text">선택된 파일: <span id="selected-filename"></span></p>
+                            <p class="file-size-text">크기: <span id="selected-filesize"></span> MB</p>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="analyze-btn" class="btn btn-primary btn-full" disabled>분석 시작</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Screen -->
+            <div id="analysis-screen" class="card hidden">
+                <div class="card-header">
+                    <h2 class="card-title">분석 진행중...</h2>
+                    <p class="card-description">음성 파일을 분석하고 있습니다</p>
+                </div>
+                <div class="card-content">
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div id="total-progress" class="progress-fill" style="width: 0%"></div>
+                        </div>
+                        <p class="progress-text">분석 진행률: <span id="progress-percentage">0%</span></p>
+                    </div>
+
+                    <div class="status-message">
+                        <p id="status-text" class="status-text">분석을 준비하고 있습니다...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Screen -->
+            <div id="error-screen" class="card hidden">
+                <div class="card-header">
+                    <h2 class="card-title" style="color: #dc2626;">분석 실패</h2>
+                    <p class="card-description">분석 중 오류가 발생했습니다</p>
+                </div>
+                <div class="card-content">
+                    <div class="alert alert-error">
+                        <div class="alert-header">
+                            <svg class="alert-icon" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+                            </svg>
+                            <span>분석 오류</span>
+                        </div>
+                        <p id="error-message">분석 처리 중 오류가 발생했습니다. 파일을 다시 확인하고 재시도해주세요.</p>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="retry-btn" class="btn btn-primary">
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M4 12a8 8 0 018-8V2.5L14.5 5 12 7.5V6a6 6 0 100 12 6 6 0 006-6h2a8 8 0 01-16 0z"/>
+                            </svg>
+                            재시도
+                        </button>
+                        <button id="new-file-btn" class="btn btn-outline">새 파일 업로드</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Result Screen -->
+            <div id="result-screen" class="card hidden">
+                <div class="card-header">
+                    <h2 class="card-title">분석 결과</h2>
+                    <p class="card-description">음성 파일 분석이 완료되었습니다</p>
+                </div>
+                <div class="card-content">
+                    <div class="result-item">
+                        <span class="result-label">■ 최종 결과:</span>
+                        <span id="final-result" class="result-value"></span>
+                    </div>
+
+                    <div id="phishing-type" class="result-item hidden">
+                        <span class="result-label">■ 유형:</span>
+                        <span id="phishing-type-value" class="result-value"></span>
+                    </div>
+
+                    <div class="result-item">
+                        <span class="result-label">■ 경고 메시지:</span>
+                    </div>
+
+                    <div id="warning-message"></div>
+
+                    <button id="reanalyze-btn" class="btn btn-primary btn-full">다시 분석</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'voice_phishing/js/main.js' %}"></script>
+</body>
+</html>

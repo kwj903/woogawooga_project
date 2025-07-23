@@ -8,146 +8,38 @@ import time
 import random
 from datetime import datetime
 
-# 메인 페이지 (index.html)
+# 메인 페이지
 def index(request):
-    """메인 페이지 - 보이스피싱 탐지 시스템 소개"""
-    return render(request, 'index.html')
+    """메인 페이지 - 보이스피싱 탐지 시스템"""
+    return render(request, 'voice_phishing/index.html')
 
-# 업로드 페이지 (upload.html)
-def upload(request):
-    """파일 업로드 페이지"""
-    return render(request, 'upload.html')
-
-# 분석 페이지 (analysis.html)
-def analysis(request):
-    """분석 진행 페이지"""
-    task_id = request.GET.get('taskId', None)
-    context = {
-        'task_id': task_id
-    }
-    return render(request, 'analysis.html', context)
-
-def analysis_detail(request, task_id):
-    """특정 Task ID의 분석 페이지"""
-    context = {
-        'task_id': task_id
-    }
-    return render(request, 'analysis.html', context)
-
-# 결과 페이지 (result.html)
-def result(request):
-    """분석 결과 페이지"""
-    task_id = request.GET.get('taskId', None)
-    context = {
-        'task_id': task_id
-    }
-    return render(request, 'result.html', context)
-
-def result_detail(request, task_id):
-    """특정 Task ID의 결과 페이지"""
-    context = {
-        'task_id': task_id
-    }
-    return render(request, 'result.html', context)
-
-# API 엔드포인트들
-
+# 분석 API
 @csrf_exempt
 @require_http_methods(["POST"])
-def api_upload(request):
-    """파일 업로드 API"""
+def analyze(request):
+    """음성 파일 분석 API"""
     try:
-        if 'file' not in request.FILES:
-            return JsonResponse({'error': '파일이 업로드되지 않았습니다.'}, status=400)
+        if 'audio_file' not in request.FILES:
+            return JsonResponse({'success': False, 'error': '음성 파일이 업로드되지 않았습니다.'}, status=400)
         
-        uploaded_file = request.FILES['file']
+        uploaded_file = request.FILES['audio_file']
         
         # 파일 형식 검증
-        allowed_extensions = ['.amr', '.mp3', '.wav']
-        file_extension = uploaded_file.name.lower().split('.')[-1]
+        allowed_extensions = ['.amr', '.mp3', '.wav', '.m4a']
+        file_name = uploaded_file.name.lower()
+        file_extension = '.' + file_name.split('.')[-1] if '.' in file_name else ''
         
-        if f'.{file_extension}' not in allowed_extensions:
+        if file_extension not in allowed_extensions:
             return JsonResponse({
-                'error': '지원하지 않는 파일 형식입니다. AMR, MP3, WAV 파일만 업로드 가능합니다.'
+                'success': False,
+                'error': '지원하지 않는 파일 형식입니다. AMR, MP3, WAV, M4A 파일만 업로드 가능합니다.'
             }, status=400)
         
         # 파일 크기 검증 (50MB)
         if uploaded_file.size > 50 * 1024 * 1024:
-            return JsonResponse({'error': '파일 크기는 50MB 이하여야 합니다.'}, status=400)
+            return JsonResponse({'success': False, 'error': '파일 크기는 50MB 이하여야 합니다.'}, status=400)
         
-        # 파일 정보 반환
-        file_info = {
-            'name': uploaded_file.name,
-            'size': uploaded_file.size,
-            'type': uploaded_file.content_type,
-            'upload_time': datetime.now().isoformat()
-        }
-        
-        return JsonResponse({
-            'success': True,
-            'message': '파일이 성공적으로 업로드되었습니다.',
-            'file_info': file_info
-        })
-        
-    except Exception as e:
-        return JsonResponse({'error': f'업로드 중 오류가 발생했습니다: {str(e)}'}, status=500)
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def api_start_analysis(request):
-    """분석 시작 API"""
-    try:
-        data = json.loads(request.body)
-        
-        # Task ID 생성
-        task_id = f"TASK-{int(time.time())}-{str(uuid.uuid4())[:8]}"
-        
-        # 분석 시작 로그 (실제로는 백그라운드 작업으로 처리)
-        print(f"분석 시작: Task ID {task_id}")
-        
-        return JsonResponse({
-            'success': True,
-            'task_id': task_id,
-            'message': '분석이 시작되었습니다.'
-        })
-        
-    except Exception as e:
-        return JsonResponse({'error': f'분석 시작 중 오류가 발생했습니다: {str(e)}'}, status=500)
-
-def api_analysis_status(request, task_id):
-    """분석 상태 확인 API"""
-    try:
-        # 실제로는 데이터베이스나 캐시에서 상태를 조회
-        # 여기서는 시뮬레이션 데이터 반환
-        
-        # 랜덤한 진행 상태 시뮬레이션
-        status_options = ['stt', 'ml', 'dl', 'completed']
-        current_status = random.choice(status_options)
-        
-        if current_status == 'completed':
-            return JsonResponse({
-                'status': 'completed',
-                'task_id': task_id,
-                'redirect_url': f'/result/{task_id}/'
-            })
-        else:
-            progress = random.randint(10, 90)
-            return JsonResponse({
-                'status': 'processing',
-                'current_step': current_status,
-                'progress': progress,
-                'task_id': task_id
-            })
-            
-    except Exception as e:
-        return JsonResponse({'error': f'상태 확인 중 오류가 발생했습니다: {str(e)}'}, status=500)
-
-def api_result(request, task_id):
-    """분석 결과 API"""
-    try:
-        # 실제로는 데이터베이스에서 결과를 조회
-        # 여기서는 시뮬레이션 데이터 반환
-        
+        # 실제 분석 로직 (여기서는 시뮬레이션)
         is_phishing = random.random() < 0.3  # 30% 확률로 피싱
         
         phishing_types = ["기관 사칭형", "대출 빙자형", "가족 사칭형", "투자 빙자형", "택배 빙자형"]
@@ -161,27 +53,37 @@ def api_result(request, task_id):
         
         if is_phishing:
             phishing_type = random.choice(phishing_types)
-            warning = random.choice(phishing_warnings)
-            confidence = random.randint(75, 95)
+            warning_message = random.choice(phishing_warnings)
         else:
-            phishing_type = "정상 통화"
-            warning = "이 통화는 정상으로 판별되었습니다. 하지만 항상 개인정보 보호에 주의하시고, 의심스러운 요청이 있을 때는 직접 해당 기관에 확인하시기 바랍니다."
-            confidence = random.randint(85, 99)
-        
-        result_data = {
-            'task_id': task_id,
-            'verdict': 'phishing' if is_phishing else 'normal',
-            'type': phishing_type,
-            'confidence': confidence,
-            'warning': warning,
-            'analysis_stage': '1차 ML + 2차 DL' if random.random() > 0.3 else '1차 ML',
-            'completed_at': datetime.now().isoformat()
-        }
+            phishing_type = None
+            warning_message = "보이스피싱 의심률이 적은 대화입니다."
         
         return JsonResponse({
             'success': True,
-            'result': result_data
+            'is_phishing': is_phishing,
+            'type': phishing_type,
+            'warning_message': warning_message,
+            'confidence': random.randint(75, 95) if is_phishing else random.randint(85, 99)
         })
         
     except Exception as e:
-        return JsonResponse({'error': f'결과 조회 중 오류가 발생했습니다: {str(e)}'}, status=500)
+        return JsonResponse({'success': False, 'error': f'분석 중 오류가 발생했습니다: {str(e)}'}, status=500)
+
+# 통계 페이지
+def statistics(request):
+    """통계 페이지"""
+    # 실제로는 데이터베이스에서 통계 데이터를 조회
+    # 여기서는 시뮬레이션 데이터
+    total_analyses = random.randint(100, 1000)
+    phishing_count = random.randint(10, total_analyses // 3)
+    normal_count = total_analyses - phishing_count
+    phishing_rate = (phishing_count / total_analyses * 100) if total_analyses > 0 else 0
+    
+    context = {
+        'total_analyses': total_analyses,
+        'phishing_count': phishing_count,
+        'normal_count': normal_count,
+        'phishing_rate': phishing_rate,
+    }
+    
+    return render(request, 'voice_phishing/statistics.html', context)
