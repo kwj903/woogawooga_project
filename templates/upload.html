@@ -1,0 +1,119 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>음성 업로드 - 보이스피싱 탐지 시스템</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- 네비게이션 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-content">
+                <a href="{% url 'woogawooga:index' %}" class="nav-logo">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>보이스피싱 판단 시스템</span>
+                </a>
+                
+                <div class="nav-menu desktop-menu">
+                    <a href="{% url 'woogawooga:index' %}" class="nav-link">홈</a>
+                    <a href="{% url 'woogawooga:upload' %}" class="nav-link active">업로드</a>
+                </div>
+                
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+            
+            <div class="mobile-menu" id="mobileMenu">
+                <a href="{% url 'woogawooga:index' %}" class="mobile-nav-link">홈</a>
+                <a href="{% url 'woogawooga:upload' %}" class="mobile-nav-link active">업로드</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 메인 콘텐츠 -->
+    <main class="main-content">
+        <div class="container upload-container">
+            <!-- 헤더 -->
+            <div class="page-header">
+                <h1>보이스피싱 판단 시스템</h1>
+                <p>음성 파일 업로드</p>
+            </div>
+
+            <!-- 업로드 카드 -->
+            <div class="card upload-card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-file-audio"></i>
+                        음성 파일 업로드
+                    </h3>
+                    <p class="card-description">※ 지원 포맷: AMR, MP3, WAV</p>
+                </div>
+                
+                <div class="card-content">
+                    <!-- 파일 드롭 영역 -->
+                    <div class="file-drop-area" id="fileDropArea" 
+                         ondrop="handleDrop(event)" 
+                         ondragover="handleDragOver(event)"
+                         ondragenter="handleDragEnter(event)"
+                         ondragleave="handleDragLeave(event)">
+                        <i class="fas fa-upload upload-icon"></i>
+                        <div class="drop-text">
+                            <p class="drop-main-text">파일을 선택하거나 여기에 드래그하세요</p>
+                            <input type="file" id="fileInput" accept=".amr,.mp3,.wav,audio/*" 
+                                   onchange="handleFileSelect(event)" style="display: none;">
+                            <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">
+                                파일 선택
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 선택된 파일 정보 -->
+                    <div class="selected-file" id="selectedFile" style="display: none;">
+                        <div class="file-info">
+                            <div class="file-details">
+                                <p class="file-name" id="fileName"></p>
+                                <p class="file-size" id="fileSize"></p>
+                            </div>
+                            <i class="fas fa-check-circle file-check"></i>
+                        </div>
+                    </div>
+
+                    <!-- 상태 메시지 -->
+                    <div class="status-message" id="statusMessage" style="display: none;">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span id="statusText"></span>
+                    </div>
+
+                    <!-- 업로드 진행률 -->
+                    <div class="upload-progress" id="uploadProgress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p class="progress-text" id="progressText">업로드 중... 0%</p>
+                    </div>
+
+                    <!-- 버튼 영역 -->
+                    <div class="button-group">
+                        <button class="btn btn-primary btn-large" id="uploadBtn" 
+                                onclick="startUpload()" disabled>
+                            업로드
+                        </button>
+                        <button class="btn btn-primary btn-large" id="analyzeBtn" 
+                                onclick="startAnalysis()" disabled>
+                            분석 시작
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="{% static 'js/script.js' %}"></script>
+    <script src="{% static 'js/upload.js' %}"></script>
+</body>
+</html>

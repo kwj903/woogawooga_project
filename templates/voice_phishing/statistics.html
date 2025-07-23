@@ -1,0 +1,59 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>woogawooga - 통계</title>
+    <link rel="stylesheet" href="{% static 'voice_phishing/css/style.css' %}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <svg class="shield-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                </svg>
+                <h1 class="header-title">woogawooga - 통계</h1>
+            </div>
+            <div class="breadcrumb">
+                <a href="{% url 'voice_phishing:index' %}" class="breadcrumb-link">홈</a>
+                <span> / 통계</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">분석 통계</h2>
+                    <p class="card-description">시스템 사용 현황</p>
+                </div>
+                <div class="card-content">
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-number">{{ total_analyses }}</div>
+                            <div class="stat-label">총 분석 건수</div>
+                        </div>
+                        <div class="stat-item phishing">
+                            <div class="stat-number">{{ phishing_count }}</div>
+                            <div class="stat-label">보이스피싱 탐지</div>
+                        </div>
+                        <div class="stat-item normal">
+                            <div class="stat-number">{{ normal_count }}</div>
+                            <div class="stat-label">정상 통화</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">{{ phishing_rate|floatformat:1 }}%</div>
+                            <div class="stat-label">피싱 탐지율</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
