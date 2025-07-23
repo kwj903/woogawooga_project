@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 dependencies = [
     "django>=5.2.4",
     "google-generativeai>=0.8.5",
+    "imbalanced-learn>=0.12.4",
     "ipykernel>=6.29.5",
     "joblib>=1.5.1",
     "jpype1>=1.5.2",
