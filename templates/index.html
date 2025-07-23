@@ -1,0 +1,133 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>보이스가드 - 보이스피싱 탐지 시스템</title>
+    <meta name="description" content="AI 기반 보이스피싱 탐지 시스템으로 사기 전화로부터 안전하게 보호받으세요">
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- 네비게이션 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-content">
+                <a href="{% url 'woogawooga:index' %}" class="nav-logo">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>보이스피싱 판단 시스템</span>
+                </a>
+                
+                <!-- 데스크톱 메뉴 -->
+                <div class="nav-menu desktop-menu">
+                    <a href="{% url 'woogawooga:index' %}" class="nav-link active">홈</a>
+                    <a href="{% url 'woogawooga:upload' %}" class="nav-link">업로드</a>
+                </div>
+                
+                <!-- 모바일 메뉴 버튼 -->
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+            
+            <!-- 모바일 메뉴 -->
+            <div class="mobile-menu" id="mobileMenu">
+                <a href="{% url 'woogawooga:index' %}" class="mobile-nav-link active">홈</a>
+                <a href="{% url 'woogawooga:upload' %}" class="mobile-nav-link">업로드</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 메인 콘텐츠 -->
+    <main class="main-content">
+        <div class="container">
+            <!-- 헤더 섹션 -->
+            <div class="hero-section">
+                <div class="hero-icon">
+                    <i class="fas fa-shield-alt"></i>
+                    <h1>보이스피싱 판단 시스템</h1>
+                </div>
+                <p class="hero-description">
+                    1차 2차 연동 탐지로 인한 정확한 보이스피싱 판단 시스템
+                </p>
+            </div>
+
+            <!-- 메인 카드 섹션 -->
+            <div class="main-cards">
+                <div class="card hover-card">
+                    <div class="card-header">
+                        <i class="fas fa-upload card-icon upload-icon"></i>
+                        <h3 class="card-title">음성 업로드</h3>
+                        <p class="card-description">
+                            보이스피싱 분석을 위해 음성 파일을 업로드하세요
+                        </p>
+                    </div>
+                    <div class="card-content">
+                        <a href="{% url 'woogawooga:upload' %}" class="btn btn-primary btn-large">
+                            분석 시작하기
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card hover-card">
+                    <div class="card-header">
+                        <i class="fas fa-bullseye card-icon accuracy-icon"></i>
+                        <h3 class="card-title">정확한 탐지</h3>
+                        <p class="card-description">
+                            1차 2차 연동 탐지로 높은 정확도의 분석 결과 제공
+                        </p>
+                    </div>
+                    <div class="card-content">
+                        <div class="feature-list">
+                            <div class="feature-item">• STT 음성-텍스트 변환</div>
+                            <div class="feature-item">• 1차 ML 모델 분석</div>
+                            <div class="feature-item">• 2차 DL 모델 검증</div>
+                            <div class="feature-item">• LLM 맞춤형 경고 생성</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 분석 과정 섹션 -->
+            <div class="process-section">
+                <h2 class="section-title">분석 과정</h2>
+                <div class="process-grid">
+                    <div class="process-step">
+                        <div class="step-number">1</div>
+                        <h3 class="step-title">음성 업로드</h3>
+                        <p class="step-description">음성 파일을 업로드합니다 (AMR, MP3, WAV)</p>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-number">2</div>
+                        <h3 class="step-title">STT 변환</h3>
+                        <p class="step-description">음성을 텍스트로 변환</p>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-number">3</div>
+                        <h3 class="step-title">1차 ML 분석</h3>
+                        <p class="step-description">머신러닝 모델로 1차 분석</p>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-number">4</div>
+                        <h3 class="step-title">2차 DL 분석</h3>
+                        <p class="step-description">딥러닝 모델로 2차 검증</p>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-number">5</div>
+                        <h3 class="step-title">LLM 경고 생성</h3>
+                        <p class="step-description">맞춤형 경고 메시지 생성</p>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-number">6</div>
+                        <h3 class="step-title">결과 확인</h3>
+                        <p class="step-description">정확한 분석 결과 확인</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="{% static 'js/script.js' %}"></script>
+</body>
+</html>
