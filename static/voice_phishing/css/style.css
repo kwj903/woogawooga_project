@@ -708,6 +708,183 @@ body {
   }
 }
 
+/* 분석 단계 스타일 */
+.analysis-steps {
+  margin: 2rem 0;
+}
+
+.analysis-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.analysis-header h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.analysis-header p {
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+  transition: all 0.3s ease;
+}
+
+.step-item.active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.step-item.completed {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.step-icon {
+  margin-right: 1rem;
+}
+
+.step-circle {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.step-item.active .step-circle {
+  background: #3b82f6;
+}
+
+.step-item.completed .step-circle {
+  background: #10b981;
+}
+
+.step-check {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: white;
+}
+
+.step-spinner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid transparent;
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.step-content {
+  flex: 1;
+}
+
+.step-title {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.step-subtitle {
+  color: #3b82f6;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.step-detail {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: #f3f4f6;
+  border-radius: 0.25rem;
+}
+
+.step-item.active .step-detail {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.step-item.completed .step-detail {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.step-status {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  min-width: 4rem;
+  text-align: right;
+}
+
+.step-item.active .step-status {
+  color: #3b82f6;
+}
+
+.step-item.completed .step-status {
+  color: #10b981;
+}
+
+.overall-progress {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.current-status {
+  margin-top: 1.5rem;
+}
+
+.current-status .status-message {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.current-status .status-message p {
+  color: #1d4ed8;
+  font-weight: 500;
+  margin: 0;
+}
+
 /* 고해상도 디스플레이 대응 */
 @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
   .shield-icon,

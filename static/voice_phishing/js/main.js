@@ -190,39 +190,223 @@ class VoicePhishingDetector {
   }
 
   async simulateAnalysisProgress() {
-    const messages = [
-      "음성 파일을 텍스트로 변환하고 있습니다...",
-      "머신러닝 모델로 1차 분석을 진행하고 있습니다...",
-      "딥러닝 모델로 정밀 분석을 수행하고 있습니다...",
-      "대화 맥락을 분석하고 최종 메시지를 생성하고 있습니다...",
+    const steps = [
+      {
+        id: 'stt',
+        title: 'STT 변환',
+        subtitle: 'VITO STT API',
+        message: 'VITO API로 음성을 텍스트로 변환',
+        progress: 25,
+        duration: 3000
+      },
+      {
+        id: 'ml',
+        title: '1차 머신러닝 분석',
+        subtitle: 'Random Forest Classifier',
+        message: '머신러닝 모델로 1차 분석을 진행하고 있습니다...',
+        progress: 50,
+        duration: 2000
+      },
+      {
+        id: 'dl',
+        title: '2차 DL 분석',
+        subtitle: 'BERT-based Transformer',
+        message: '딥러닝 모델로 정밀 분석을 수행하고 있습니다...',
+        progress: 75,
+        duration: 2500
+      },
+      {
+        id: 'llm',
+        title: 'LLM 기반 메시지 생성',
+        subtitle: 'GPT-4o',
+        message: '머신러닝 모델로 1차 분석을 진행하고 있습니다...',
+        progress: 100,
+        duration: 2000
+      }
     ]
 
-    const totalSteps = messages.length
-    let currentStep = 0
+    // 분석 진행 상황 표시를 위한 HTML 업데이트
+    this.updateAnalysisSteps(steps)
 
-    for (const message of messages) {
-      currentStep++
-      this.updateStatusMessage(message)
-
-      // 각 단계별 진행률 업데이트
-      const startProgress = ((currentStep - 1) / totalSteps) * 100
-      const endProgress = (currentStep / totalSteps) * 100
-
-      // 단계별 진행률 애니메이션
-      for (let progress = startProgress; progress <= endProgress; progress += 1) {
-        await this.delay(50)
-        this.updateTotalProgress(progress)
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i]
+      
+      // 현재 단계 활성화
+      this.setCurrentStep(step.id, step.message)
+      
+      // 진행률 업데이트
+      await this.animateProgress(step.progress, step.duration)
+      
+      // 단계 완료 표시
+      this.markStepCompleted(step.id)
+      
+      if (i < steps.length - 1) {
+        await this.delay(500) // 단계 간 간격
       }
     }
   }
 
+  updateAnalysisSteps(steps) {
+    // 분석 화면의 card-content 찾기
+    const analysisScreen = document.getElementById('analysis-screen')
+    const analysisContainer = analysisScreen.querySelector('.card-content')
+    
+    // 기존 분석 단계 UI 제거하고 새로 생성
+    const existingSteps = document.getElementById('analysis-steps')
+    if (existingSteps) {
+      existingSteps.remove()
+    }
+    
+    const stepsHTML = `
+        <div id="analysis-steps" class="analysis-steps">
+          ${steps.map(step => `
+            <div class="step-item" id="step-${step.id}">
+              <div class="step-icon">
+                <div class="step-circle">
+                  <svg class="step-check hidden" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                  </svg>
+                  <div class="step-spinner hidden">
+                    <div class="spinner"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="step-content">
+                <div class="step-title">${step.title}</div>
+                <div class="step-subtitle">${step.subtitle}</div>
+                <div class="step-detail hidden">
+                  ${step.title === 'STT 변환' ? step.message : '진행 중...'}
+                </div>
+              </div>
+              <div class="step-status">진행 대기</div>
+            </div>
+          `).join('')}
+          
+          <div class="overall-progress">
+            <div class="progress-label">
+              <span>전체 진행률</span>
+              <span id="overall-percentage">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div id="overall-progress-fill" class="progress-fill" style="width: 0%"></div>
+            </div>
+          </div>
+          
+          <div class="current-status">
+            <div class="status-message">
+              <p id="current-status-text">분석을 시작합니다...</p>
+            </div>
+          </div>
+        </div>
+      `
+      
+    // 기존 진행률 표시 요소 제거
+    const existingProgress = analysisContainer.querySelector('.progress-container')
+    const existingStatus = analysisContainer.querySelector('.status-message')
+    
+    if (existingProgress) existingProgress.remove()
+    if (existingStatus) existingStatus.remove()
+    
+    analysisContainer.insertAdjacentHTML('beforeend', stepsHTML)
+  }
+
+  setCurrentStep(stepId, message) {
+    // 모든 단계를 대기 상태로 리셋
+    document.querySelectorAll('.step-item').forEach(item => {
+      item.classList.remove('active', 'completed')
+      item.querySelector('.step-status').textContent = '진행 대기'
+      item.querySelector('.step-spinner').classList.add('hidden')
+      item.querySelector('.step-check').classList.add('hidden')
+      item.querySelector('.step-detail').classList.add('hidden')
+    })
+    
+    // 현재 단계 활성화
+    const currentStep = document.getElementById(`step-${stepId}`)
+    if (currentStep) {
+      currentStep.classList.add('active')
+      currentStep.querySelector('.step-status').textContent = '진행 중'
+      currentStep.querySelector('.step-spinner').classList.remove('hidden')
+      currentStep.querySelector('.step-detail').classList.remove('hidden')
+    }
+    
+    // 상태 메시지 업데이트
+    this.updateStatusMessage(message)
+  }
+
+  markStepCompleted(stepId) {
+    const step = document.getElementById(`step-${stepId}`)
+    if (step) {
+      step.classList.remove('active')
+      step.classList.add('completed')
+      step.querySelector('.step-status').textContent = '완료'
+      step.querySelector('.step-spinner').classList.add('hidden')
+      step.querySelector('.step-check').classList.remove('hidden')
+    }
+  }
+
+  async animateProgress(targetProgress, duration) {
+    const startTime = Date.now()
+    
+    // 이전 진행률을 0으로 리셋하여 항상 0부터 시작
+    let startProgress = 0
+    if (targetProgress === 25) {
+      startProgress = 0
+    } else if (targetProgress === 50) {
+      startProgress = 25
+    } else if (targetProgress === 75) {
+      startProgress = 50
+    } else if (targetProgress === 100) {
+      startProgress = 75
+    }
+    
+    return new Promise(resolve => {
+      const animate = () => {
+        const elapsed = Date.now() - startTime
+        const progress = Math.min(elapsed / duration, 1)
+        const currentProgress = startProgress + (targetProgress - startProgress) * progress
+        
+        this.updateTotalProgress(currentProgress)
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate)
+        } else {
+          resolve()
+        }
+      }
+      animate()
+    })
+  }
+
   updateTotalProgress(progress) {
-    document.getElementById("total-progress").style.width = `${progress}%`
-    document.getElementById("progress-percentage").textContent = `${Math.round(progress)}%`
+    const totalProgressEl = document.getElementById("total-progress")
+    const overallProgressEl = document.getElementById("overall-progress-fill")
+    const progressPercentageEl = document.getElementById("progress-percentage")
+    const overallPercentageEl = document.getElementById("overall-percentage")
+    
+    if (totalProgressEl) {
+      totalProgressEl.style.width = `${progress}%`
+    }
+    if (overallProgressEl) {
+      overallProgressEl.style.width = `${progress}%`
+    }
+    if (progressPercentageEl) {
+      progressPercentageEl.textContent = `${Math.round(progress)}%`
+    }
+    if (overallPercentageEl) {
+      overallPercentageEl.textContent = `${Math.round(progress)}%`
+    }
   }
 
   updateStatusMessage(message) {
-    document.getElementById("status-text").textContent = message
+    const statusTextEl = document.getElementById("status-text")
+    const currentStatusTextEl = document.getElementById("current-status-text")
+    
+    if (statusTextEl) {
+      statusTextEl.textContent = message
+    }
+    if (currentStatusTextEl) {
+      currentStatusTextEl.textContent = message
+    }
   }
 
   displayResult(result) {
