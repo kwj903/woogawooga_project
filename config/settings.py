@@ -79,19 +79,18 @@ WSGI_APPLICATION = 'config.wsgi.application'
 #         'NAME': BASE_DIR / 'db.sqlite3',
 #     }
 # }
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "woogawooga_db",  # 데이터베이스이름
-        "USER": "root",  # root
-        "PASSWORD": "0000",  # 비밀번호
-        "HOST": "127.0.0.1",  # 데이테베이스  호스트명  (동일  기기면 localhost)
-        "PORT": "3306",  # 데이터베이스  포트번호  (기본  3306)
-        "CHARSET": "utf8mb4",  # 4바이트  UTF-8
+        "NAME": "woogawooga_db",
+        "USER": "woogawooga_CY",
+        "PASSWORD": "CY123",
+        "HOST": "192.168.0.13",
+        "PORT": "3306",
+        "CHARSET": "utf8mb4", 
     }
 }
-
-
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
