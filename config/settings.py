@@ -100,12 +100,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "woogawooga_db",  # 데이터베이스이름
-        "USER": "woogawooga_WJ",  # WJ 전용 계정
-        "PASSWORD": "WJ123",  # WJ 비밀번호
-        "HOST": "192.168.0.13",  # 당신의 컴퓨터 IP
-        "PORT": "3306",  # 데이터베이스 포트번호
-        "CHARSET": "utf8mb4",  # 4바이트 UTF-8
+        "NAME": "woogawooga_db",
+        "USER": "woogawooga_CY",
+        "PASSWORD": "CY123",
+        "HOST": "192.168.0.13",
+        "PORT": "3306",
+        "CHARSET": "utf8mb4", 
     }
 }
 
