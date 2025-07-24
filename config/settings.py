@@ -11,9 +11,14 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# .env 파일 로드
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -79,17 +84,31 @@ WSGI_APPLICATION = 'config.wsgi.application'
 #         'NAME': BASE_DIR / 'db.sqlite3',
 #     }
 # }
+
+# 내 로컬디비
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.mysql",
+#         "NAME": "woogawooga",  # 데이터베이스이름
+#         "USER": "root",  # root
+#         "PASSWORD": "rhkr!77dlf8@",  # 비밀번호
+#         "HOST": "127.0.0.1",  # 데이테베이스  호스트명  (동일  기기면 localhost)
+#         "PORT": "3306",  # 데이터베이스  포트번호  (기본  3306)
+#         "CHARSET": "utf8mb4",  # 4바이트  UTF-8
+#     }
+# }
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "woogawooga",  # 데이터베이스이름
-        "USER": "root",  # root
-        "PASSWORD": "0000",  # 비밀번호
-        "HOST": "127.0.0.1",  # 데이테베이스  호스트명  (동일  기기면 localhost)
-        "PORT": "3306",  # 데이터베이스  포트번호  (기본  3306)
-        "CHARSET": "utf8mb4",  # 4바이트  UTF-8
+        "NAME": "woogawooga_db",  # 데이터베이스이름
+        "USER": "woogawooga_WJ",  # WJ 전용 계정
+        "PASSWORD": "WJ123",  # WJ 비밀번호
+        "HOST": "192.168.0.13",  # 당신의 컴퓨터 IP
+        "PORT": "3306",  # 데이터베이스 포트번호
+        "CHARSET": "utf8mb4",  # 4바이트 UTF-8
     }
 }
+
 
 
 # Password validation
@@ -133,3 +152,11 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# VITO API 설정
+VITO_API_KEY = os.getenv('VITO_API_KEY')
+VITO_API_URL = 'https://openapi.vito.ai/v1'
+
+# OpenAI API 설정 (백업용)
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+GPT_API_KEY = os.getenv('GPT_API_KEY')

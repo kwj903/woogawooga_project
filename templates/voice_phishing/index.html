@@ -141,6 +141,40 @@
 
                     <div id="warning-message"></div>
 
+                    <!-- 피드백 섹션 -->
+                    <div class="feedback-section">
+                        <div class="result-item">
+                            <span class="result-label">■ 분석 결과가 정확한가요?</span>
+                        </div>
+                        
+                        <div class="feedback-options">
+                            <label class="feedback-option">
+                                <input type="radio" name="feedback-accuracy" value="accurate">
+                                <span class="radio-custom"></span>
+                                <span class="option-text">정확함</span>
+                            </label>
+                            <label class="feedback-option">
+                                <input type="radio" name="feedback-accuracy" value="inaccurate">
+                                <span class="radio-custom"></span>
+                                <span class="option-text">부정확함</span>
+                            </label>
+                        </div>
+
+                        <div class="feedback-comment">
+                            <textarea id="feedback-comment" placeholder="추가 의견이 있으시면 자유롭게 작성해주세요. (선택사항)" rows="3"></textarea>
+                        </div>
+
+                        <div class="feedback-buttons">
+                            <button id="submit-feedback-btn" class="btn btn-outline" disabled>
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zm0 4.7l-8 5.334L4 8.7V6.297l8 5.333 8-5.333V8.7z"/>
+                                </svg>
+                                피드백 제출
+                            </button>
+                            <div id="feedback-status" class="feedback-status hidden"></div>
+                        </div>
+                    </div>
+
                     <button id="reanalyze-btn" class="btn btn-primary btn-full">다시 분석</button>
                 </div>
             </div>

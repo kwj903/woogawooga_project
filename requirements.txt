@@ -1,0 +1,33 @@
+# Django 및 기본 웹 프레임워크
+Django>=5.0.0
+djangorestframework>=3.14.0
+
+# 데이터베이스
+mysqlclient>=2.1.0
+
+# 환경변수 관리
+python-dotenv>=1.0.0
+
+# HTTP 요청
+requests>=2.31.0
+
+# 머신러닝 및 데이터 처리
+numpy>=1.24.0
+scikit-learn>=1.3.0
+pandas>=2.0.0
+
+# 자연어 처리
+kiwipiepy>=0.15.0
+
+# LightGBM 모델
+lightgbm>=4.0.0
+
+# 오디오 처리 (필요시)
+pydub>=0.25.0
+
+# 로그 및 모니터링
+python-json-logger>=2.0.0
+
+# 개발 도구
+pytest>=7.0.0
+pytest-django>=4.5.0

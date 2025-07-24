@@ -53,7 +53,7 @@ class InferenceResult(models.Model):
     rslt_id = models.CharField(max_length=50, verbose_name="결과ID")
     ocrn_no = models.ForeignKey(ProcessdFile, on_delete=models.CASCADE, verbose_name="발생번호")
     mdl_id = models.CharField(max_length=20, verbose_name="모델ID")
-    file_id = models.CharField(max_length=20, verbose_name="파일ID")
+    file_id = models.CharField(max_length=50, verbose_name="파일ID")
     prdt_scr = models.DecimalField(max_digits=4, decimal_places=3, verbose_name="예측점수")
     ml_rslt_cd = models.CharField(max_length=10, choices=ML_RESULT_CHOICES, verbose_name="ML결과코드")
     dl_jdgm_yn = models.CharField(max_length=1, null=True, blank=True, verbose_name="DL판단여부")

@@ -49,6 +49,9 @@ class VoicePhishingDetector {
     // Result screen button
     document.getElementById("reanalyze-btn").addEventListener("click", this.resetToUpload.bind(this))
 
+    // Feedback related events
+    this.setupFeedbackListeners()
+
     // 모바일에서 화면 회전 시 레이아웃 재조정
     window.addEventListener("orientationchange", () => {
       setTimeout(() => {
@@ -279,6 +282,10 @@ class VoicePhishingDetector {
         await this.delay(500) // 단계 간 간격
       }
     }
+
+    // 모든 단계 완료 후 최종 완료 메시지 표시
+    await this.delay(300)
+    this.showAnalysisCompleted()
   }
 
   updateAnalysisSteps(steps) {
@@ -445,6 +452,9 @@ class VoicePhishingDetector {
   }
 
   displayResult(result) {
+    // 피드백을 위해 현재 분석 결과 저장
+    this.currentAnalysisResult = result
+    
     const finalResult = document.getElementById("final-result")
     const phishingTypeDiv = document.getElementById("phishing-type")
     const phishingTypeValue = document.getElementById("phishing-type-value")
@@ -536,6 +546,152 @@ class VoicePhishingDetector {
     document.getElementById("breadcrumb-text").textContent = breadcrumbTexts[screenName]
 
     this.currentState = screenName
+  }
+
+  showAnalysisCompleted() {
+    // 모든 단계를 완료 상태로 표시
+    document.querySelectorAll('.step-item').forEach(item => {
+      if (!item.classList.contains('completed')) {
+        item.classList.add('completed')
+        item.querySelector('.step-status').textContent = '완료'
+        item.querySelector('.step-spinner').classList.add('hidden')
+        item.querySelector('.step-check').classList.remove('hidden')
+      }
+    })
+    
+    // 전체 진행률을 100%로 설정
+    this.updateTotalProgress(100)
+    
+    // 최종 완료 메시지 표시
+    this.updateStatusMessage("✅ 모든 분석이 완료되었습니다. 결과를 생성하는 중...")
+    
+    // 완료 효과 추가
+    const overallProgress = document.querySelector('.overall-progress')
+    if (overallProgress) {
+      overallProgress.style.border = '2px solid #10b981'
+      overallProgress.style.backgroundColor = '#ecfdf5'
+    }
+  }
+
+  setupFeedbackListeners() {
+    // 라디오 버튼 변경 시 제출 버튼 활성화
+    const radioButtons = document.querySelectorAll('input[name="feedback-accuracy"]')
+    const submitBtn = document.getElementById('submit-feedback-btn')
+    
+    if (radioButtons.length > 0 && submitBtn) {
+      radioButtons.forEach(radio => {
+        radio.addEventListener('change', () => {
+          if (document.querySelector('input[name="feedback-accuracy"]:checked')) {
+            submitBtn.disabled = false
+          }
+        })
+      })
+      
+      // 피드백 제출 버튼 클릭
+      submitBtn.addEventListener('click', this.submitFeedback.bind(this))
+    }
+  }
+
+  async submitFeedback() {
+    try {
+      const submitBtn = document.getElementById('submit-feedback-btn')
+      const statusDiv = document.getElementById('feedback-status')
+      const accuracyRadio = document.querySelector('input[name="feedback-accuracy"]:checked')
+      const commentTextarea = document.getElementById('feedback-comment')
+      
+      if (!accuracyRadio) {
+        this.showFeedbackStatus('정확도를 선택해주세요.', 'error')
+        return
+      }
+      
+      // 버튼 비활성화 및 로딩 상태
+      submitBtn.disabled = true
+      submitBtn.innerHTML = `
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" class="animate-spin">
+          <path d="M12 4V2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8z"/>
+        </svg>
+        제출 중...
+      `
+      
+      // 피드백 데이터 준비
+      const feedbackData = {
+        rslt_id: this.currentAnalysisResult?.rslt_id,
+        ocrn_no: this.currentAnalysisResult?.ocrn_no,
+        user_prediction: accuracyRadio.value === 'accurate' ? 'Y' : 'N',
+        comment: commentTextarea.value.trim() || ''
+      }
+      
+      // CSRF 토큰 가져오기
+      const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value
+      
+      // 서버로 피드백 전송
+      const response = await fetch('/feedback/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+        },
+        body: JSON.stringify(feedbackData)
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        this.showFeedbackStatus('피드백이 성공적으로 제출되었습니다. 감사합니다!', 'success')
+        
+        // 폼 비활성화
+        radioButtons.forEach(radio => radio.disabled = true)
+        commentTextarea.disabled = true
+        
+        // 버튼 완료 상태로 변경
+        submitBtn.innerHTML = `
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          제출 완료
+        `
+      } else {
+        this.showFeedbackStatus(result.error || '피드백 제출에 실패했습니다.', 'error')
+        
+        // 버튼 원래 상태로 복원
+        submitBtn.disabled = false
+        submitBtn.innerHTML = `
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zm0 4.7l-8 5.334L4 8.7V6.297l8 5.333 8-5.333V8.7z"/>
+          </svg>
+          피드백 제출
+        `
+      }
+    } catch (error) {
+      console.error('Feedback submission error:', error)
+      this.showFeedbackStatus('네트워크 오류가 발생했습니다. 다시 시도해주세요.', 'error')
+      
+      // 버튼 원래 상태로 복원
+      const submitBtn = document.getElementById('submit-feedback-btn')
+      submitBtn.disabled = false
+      submitBtn.innerHTML = `
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zm0 4.7l-8 5.334L4 8.7V6.297l8 5.333 8-5.333V8.7z"/>
+        </svg>
+        피드백 제출
+      `
+    }
+  }
+
+  showFeedbackStatus(message, type) {
+    const statusDiv = document.getElementById('feedback-status')
+    if (statusDiv) {
+      statusDiv.textContent = message
+      statusDiv.className = `feedback-status ${type}`
+      statusDiv.classList.remove('hidden')
+      
+      // 3초 후 상태 메시지 숨김
+      if (type === 'success') {
+        setTimeout(() => {
+          statusDiv.classList.add('hidden')
+        }, 3000)
+      }
+    }
   }
 
   delay(ms) {
