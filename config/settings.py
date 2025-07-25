@@ -101,8 +101,8 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
         "NAME": "woogawooga_db",
-        "USER": "woogawooga_CY",
-        "PASSWORD": "CY123",
+        "USER": "woogawooga_WJ",
+        "PASSWORD": "WJ123",
         "HOST": "192.168.0.13",
         "PORT": "3306",
         "CHARSET": "utf8mb4", 
