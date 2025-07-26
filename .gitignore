@@ -17,7 +17,7 @@ models/*
 CLAUDE.md
 .vscode/*
 .claude/*
-
+.mcp.json
 # django 제외할 파일
 *.pyc
 *.pyo
