@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>분석 결과 - 보이스피싱 탐지 시스템</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -99,8 +100,64 @@
                         <p id="warningText">분석 결과를 기다리는 중입니다...</p>
                     </div>
 
+                    <!-- 피드백 섹션 -->
+                    <div class="feedback-section" id="feedbackSection" style="display: none;">
+                        <h3>■ 분석 결과에 대한 피드백</h3>
+                        <p class="feedback-description">분석 결과가 정확한지 피드백해주세요. 여러분의 의견은 시스템 개선에 도움이 됩니다.</p>
+                        
+                        <div class="feedback-form">
+                            <div class="feedback-question">
+                                <label class="feedback-label">이 분석 결과가 정확하다고 생각하시나요?</label>
+                                <div class="feedback-options">
+                                    <label class="radio-option">
+                                        <input type="radio" name="feedback" value="Y" id="feedbackYes">
+                                        <span class="radio-text">예, 정확합니다</span>
+                                    </label>
+                                    <label class="radio-option">
+                                        <input type="radio" name="feedback" value="N" id="feedbackNo">
+                                        <span class="radio-text">아니오, 잘못되었습니다</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="feedback-comment">
+                                <label for="feedbackComment" class="feedback-label">추가 의견 (선택사항):</label>
+                                <textarea 
+                                    id="feedbackComment" 
+                                    placeholder="예시: '실제로는 정상 통화였는데 피싱으로 판별되었습니다', '유형 분류가 정확합니다' 등 자유롭게 의견을 작성해주세요..."
+                                    rows="4"
+                                    maxlength="1000"
+                                ></textarea>
+                                <div class="char-count">
+                                    <span id="charCount">0</span>/1000
+                                </div>
+                            </div>
+                            
+                            <div class="feedback-buttons">
+                                <button class="btn btn-primary" onclick="submitFeedback()" id="submitFeedbackBtn">
+                                    <i class="fas fa-paper-plane"></i>
+                                    피드백 제출
+                                </button>
+                                <button class="btn btn-outline" onclick="hideFeedback()">
+                                    <i class="fas fa-times"></i>
+                                    취소
+                                </button>
+                            </div>
+                            
+                            <!-- 피드백 성공 메시지 -->
+                            <div class="feedback-success" id="feedbackSuccess" style="display: none;">
+                                <i class="fas fa-check-circle"></i>
+                                <span>피드백이 성공적으로 제출되었습니다. 감사합니다!</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- 액션 버튼 -->
                     <div class="button-group">
+                        <button class="btn btn-secondary btn-large" onclick="showFeedback()" id="feedbackBtn" style="display: none;">
+                            <i class="fas fa-comment"></i>
+                            피드백 제출
+                        </button>
                         <button class="btn btn-primary btn-large" onclick="retryAnalysis()">
                             <i class="fas fa-redo"></i>
                             다시 분석
@@ -117,5 +174,7 @@
 
     <script src="{% static 'js/script.js' %}"></script>
     <script src="{% static 'js/result.js' %}"></script>
+    <script src="{% static 'js/feedback-fix.js' %}"></script>
+    <script src="{% static 'js/cache-fix.js' %}"></script>
 </body>
 </html>

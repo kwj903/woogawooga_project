@@ -293,7 +293,7 @@ def vito_stt(audio_file):
 def analyze_with_first_model(text):
     """1차 Stacking 모델 분석 - 보류 구간 로직 포함"""
     try:
-        logger.info("1차 모델 분석 시작")
+        log_system_info("INFO", "1차 모델 분석 시작", audio_file.name, client_ip)
         
         # 모델 로드 확인
         if not stacking_model or not tfidf_vectorizer:
@@ -463,7 +463,7 @@ def analyze_with_second_model(text):
         }
 
 def generate_llm_explanation(text, first_result, second_result=None):
-    """1차/2차 모델 결과를 기반으로 한 임시 설명 생성 (추후 LLM 구현 예정)"""
+    """OpenAI GPT-4o를 사용한 보이스피싱 분석 설명 생성"""
     try:
         # 최종 판별 결과 결정
         if second_result is not None:
@@ -477,13 +477,154 @@ def generate_llm_explanation(text, first_result, second_result=None):
             confidence = first_result['confidence']
             decision_source = "1차 모델 (Stacking)"
         
-        # 피싱 유형별 메시지 템플릿
-        phishing_types = ['기관사칭형', '대출빙자형', '투자빙자형', '선납금요구형']
+        # OpenAI API 키 확인
+        openai_api_key = getattr(settings, 'OPENAI_API_KEY', None)
+        if not openai_api_key or openai_api_key == 'your_openai_api_key_here':
+            logger.warning("OpenAI API 키가 설정되지 않음. 기본 로직 사용")
+            return generate_fallback_explanation(text, first_result, second_result)
+        
+        # OpenAI API 호출
+        from openai import OpenAI
+        client = OpenAI(api_key=openai_api_key)
+        
+        # 프롬프트 생성
+        is_phishing = final_prediction == 1
+        prompt = create_analysis_prompt(text, is_phishing, confidence, decision_source, first_result, second_result)
+        
+        # GPT-4o 호출
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "당신은 보이스피싱 전문 분석가입니다. 주어진 통화 내용과 AI 모델의 분석 결과를 바탕으로 사용자에게 명확하고 실용적인 경고 메시지와 설명을 제공해야 합니다."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=800,
+            temperature=0.3,
+            timeout=10
+        )
+        
+        llm_response = response.choices[0].message.content.strip()
+        
+        # LLM 응답 파싱
+        parsed_result = parse_llm_response(llm_response, final_prediction, confidence, decision_source, first_result)
+        
+        logger.info(f"OpenAI LLM 설명 생성 완료: {parsed_result['phishing_type']}")
+        return parsed_result
+        
+    except Exception as e:
+        logger.error(f"OpenAI LLM 설명 생성 실패: {str(e)}")
+        # 실패 시 기본 로직으로 폴백
+        return generate_fallback_explanation(text, first_result, second_result)
+
+def create_analysis_prompt(text, is_phishing, confidence, decision_source, first_result, second_result=None):
+    """OpenAI 프롬프트 생성"""
+    
+    base_prompt = f"""
+다음은 보이스피싱 탐지 시스템의 분석 결과입니다:
+
+**통화 내용 (STT 변환):**
+{text[:500]}{"..." if len(text) > 500 else ""}
+
+**AI 모델 분석 결과:**
+- 최종 판별: {"보이스피싱" if is_phishing else "정상 통화"}
+- 신뢰도: {confidence:.1%}
+- 판별 모델: {decision_source}
+- 1차 모델 결과: {first_result.get('decision_type', 'N/A')}
+"""
+
+    if second_result:
+        base_prompt += f"- 2차 모델 결과: {second_result.get('decision_type', 'N/A')}\n"
+
+    task_prompt = """
+위 정보를 바탕으로 다음 형식으로 응답해주세요:
+
+PHISHING_TYPE: [구체적인 피싱 유형 또는 '정상통화']
+WARNING: [사용자를 위한 명확한 경고 메시지 또는 안전 메시지]
+EXPLANATION: [왜 이런 판별을 했는지에 대한 간단한 설명]
+RISK_FACTORS: [위험 요소들을 쉼표로 구분, 없으면 '없음']
+
+**보이스피싱 유형 분류 기준:**
+- 기관사칭형: 공공기관(국세청, 경찰청, 금감원 등)을 사칭
+- 지인사칭형: 가족, 친구, 지인을 사칭하여 돈을 요구
+- 택배사칭형: 택배회사를 사칭하여 개인정보 요구
+- 대출빙자형: 대출 제안으로 개인정보나 수수료 요구
+- 투자빙자형: 고수익 투자를 미끼로 돈을 요구
+- 수사기관사칭형: 검찰, 경찰 등 수사기관을 사칭
+- 금융기관사칭형: 은행, 카드사 등 금융기관을 사칭
+
+**중요 지침:**
+1. 경고 메시지는 구체적이고 실행 가능한 조치를 포함해야 합니다
+2. 보이스피싱의 경우 즉시 통화 종료, 직접 기관 확인 등을 권고
+3. 정상 통화도 지속적인 주의를 당부
+4. 한국어로 자연스럽게 작성
+5. 각 항목은 한 줄로 작성
+"""
+    
+    return base_prompt + task_prompt
+
+def parse_llm_response(llm_response, final_prediction, confidence, decision_source, first_result):
+    """LLM 응답 파싱"""
+    try:
+        lines = llm_response.strip().split('\n')
+        result = {
+            'phishing_type': '분석 오류',
+            'warning': '분석 결과를 처리하는 중 오류가 발생했습니다.',
+            'explanation': 'LLM 응답 파싱에 실패했습니다.',
+            'risk_factors': [],
+            'analysis_process': [],
+            'confidence_level': confidence,
+            'decision_source': decision_source
+        }
+        
+        for line in lines:
+            if line.startswith('PHISHING_TYPE:'):
+                result['phishing_type'] = line.replace('PHISHING_TYPE:', '').strip()
+            elif line.startswith('WARNING:'):
+                result['warning'] = line.replace('WARNING:', '').strip()
+            elif line.startswith('EXPLANATION:'):
+                result['explanation'] = line.replace('EXPLANATION:', '').strip()
+            elif line.startswith('RISK_FACTORS:'):
+                factors_str = line.replace('RISK_FACTORS:', '').strip()
+                if factors_str and factors_str != '없음':
+                    result['risk_factors'] = [f.strip() for f in factors_str.split(',')]
+                else:
+                    result['risk_factors'] = []
+        
+        # 분석 과정 정보 추가
+        process_info = []
+        if first_result.get('decision_type') == 'immediate_normal':
+            process_info.append("1차 모델에서 즉시 정상 판별")
+        elif first_result.get('decision_type') == 'immediate_phishing':
+            process_info.append("1차 모델에서 즉시 피싱 판별")
+        elif first_result.get('decision_type') == 'pending':
+            process_info.append("1차 모델 보류 → 2차 모델 분석")
+        
+        result['analysis_process'] = process_info
+        return result
+        
+    except Exception as e:
+        logger.error(f"LLM 응답 파싱 오류: {str(e)}")
+        return generate_fallback_explanation("", {'prediction': final_prediction, 'confidence': confidence}, None)
+
+def generate_fallback_explanation(text, first_result, second_result=None):
+    """OpenAI 실패 시 사용할 기본 설명 생성 (기존 로직)"""
+    try:
+        # 최종 판별 결과 결정
+        if second_result is not None:
+            final_prediction = second_result['prediction']
+            confidence = second_result['confidence']
+            decision_source = "2차 모델 (LightGBM)"
+        else:
+            final_prediction = first_result['prediction']
+            confidence = first_result['confidence']
+            decision_source = "1차 모델 (Stacking)"
+        
+        # 피싱 유형별 메시지 템플릿 (한국 보이스피싱 실제 유형 반영)
+        phishing_types = ['기관사칭형', '지인사칭형', '택배사칭형', '대출빙자형', '투자빙자형', '수사기관사칭형', '금융기관사칭형']
         
         if final_prediction == 1:  # 보이스피싱
             phishing_type = random.choice(phishing_types)
             
-            # 신뢰도에 따른 경고 메시지 생성
             if confidence >= 0.8:
                 warning = f"⚠️ 고위험: 보이스피싱 가능성이 매우 높습니다 (신뢰도: {confidence:.1%}). 즉시 통화를 종료하고 해당 기관에 직접 확인하시기 바랍니다."
             elif confidence >= 0.6:
@@ -492,13 +633,7 @@ def generate_llm_explanation(text, first_result, second_result=None):
                 warning = f"⚠️ 저위험: 보이스피싱 가능성이 있습니다 (신뢰도: {confidence:.1%}). 개인정보 제공에 주의하시기 바랍니다."
             
             explanation = f"{decision_source}에서 '{phishing_type}' 패턴으로 분류되었습니다. 기관명 사칭, 개인정보 요구, 금전 관련 유도 등의 의심 요소가 감지되었습니다."
-            
-            risk_factors = [
-                "기관명 언급",
-                "계좌번호 요구",
-                "개인정보 확인 요청",
-                "금전 관련 언급"
-            ]
+            risk_factors = ["기관명 언급", "계좌번호 요구", "개인정보 확인 요청", "금전 관련 언급"]
             
         else:  # 정상통화
             phishing_type = '정상통화'
@@ -511,7 +646,6 @@ def generate_llm_explanation(text, first_result, second_result=None):
                 warning = f"⚠️ 주의: 판별이 애매한 통화입니다 (신뢰도: {confidence:.1%}). 지속적인 주의가 필요합니다."
             
             explanation = f"{decision_source}에서 정상 통화로 분류되었습니다. 보이스피싱 의심 요소가 발견되지 않았거나 미미한 수준입니다."
-            
             risk_factors = []
         
         # 분석 과정 정보 추가
@@ -523,7 +657,7 @@ def generate_llm_explanation(text, first_result, second_result=None):
         elif first_result.get('decision_type') == 'pending':
             process_info.append("1차 모델 보류 → 2차 모델 분석")
         
-        result = {
+        return {
             'phishing_type': phishing_type,
             'warning': warning,
             'explanation': explanation,
@@ -531,16 +665,11 @@ def generate_llm_explanation(text, first_result, second_result=None):
             'analysis_process': process_info,
             'confidence_level': confidence,
             'decision_source': decision_source,
-            'note': '※ 이 결과는 AI 모델 기반 분석이며, 추후 LLM 기반 상세 설명으로 업그레이드 예정입니다.'
+            'note': '※ 기본 분석 로직 사용 (OpenAI API 연결 실패)'
         }
         
-        logger.info(f"설명 생성 완료: {phishing_type}, 신뢰도: {confidence:.3f}")
-        return result
-        
     except Exception as e:
-        logger.error(f"설명 생성 실패: {str(e)}")
-        
-        # 오류 시 기본 응답
+        logger.error(f"기본 설명 생성 실패: {str(e)}")
         return {
             'phishing_type': '분석 오류',
             'warning': "분석 중 오류가 발생했습니다. 통화 내용을 수동으로 검토해주세요.",
@@ -595,6 +724,21 @@ def safe_file_id(ocrn_no):
         logger.warning(f"file_id 길이 {len(str_ocrn_no)}자 초과 - 50자로 단축")
         return str_ocrn_no[:50]
 
+
+def log_system_info(level, message, file_name=None, ip_address=None):
+    """시스템 로그를 데이터베이스에 기록하는 헬퍼 함수"""
+    try:
+        SystemLog.objects.create(
+            level=level,
+            message=message,
+            file_name=file_name or 'SYSTEM',
+            ip_address=ip_address,
+            created_at=timezone.now()
+        )
+        logger.info(f"[DB_LOG] {level}: {message}")
+    except Exception as e:
+        logger.error(f"시스템 로그 저장 실패: {e}")
+
 def get_client_ip(request):
     """클라이언트 IP 주소 가져오기"""
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -618,7 +762,7 @@ def analyze(request):
     client_ip = get_client_ip(request)
     ocrn_no = str(uuid.uuid4())  # 고유 발생번호 생성
     
-    logger.info(f"=== 분석 요청 시작 ===")
+    log_system_info("INFO", "=== 분석 요청 시작 ===", audio_file.name if "audio_file" in locals() else "SYSTEM", client_ip)
     logger.info(f"클라이언트 IP: {client_ip}")
     logger.info(f"발생번호 (ocrn_no): {ocrn_no} (길이: {len(ocrn_no)})")
     logger.info(f"요청 메서드: {request.method}")
@@ -627,12 +771,12 @@ def analyze(request):
     try:
         # 업로드된 파일 확인
         if 'audio_file' not in request.FILES:
-            VoicePhishingSystemLog.objects.create(
-                log_nm='AUDIO_FILE_MISSING',
-                ocrn_no_id=ocrn_no,
-                log_reg_dt=timezone.now(),
-                log_ocrn_pstn='UPLOAD_VALIDATION',
-                err_rsn='오디오 파일이 업로드되지 않음'
+            # 기존 SystemLog 사용 (VoicePhishingSystemLog 대신)
+            SystemLog.objects.create(
+                level='ERROR',
+                message='오디오 파일이 업로드되지 않음',
+                file_name='UPLOAD_VALIDATION',
+                ip_address=client_ip
             )
             return JsonResponse({
                 'success': False,
@@ -646,12 +790,11 @@ def analyze(request):
         file_extension = '.' + audio_file.name.lower().split('.')[-1]
         
         if file_extension not in allowed_extensions:
-            VoicePhishingSystemLog.objects.create(
-                log_nm='INVALID_FILE_FORMAT',
-                ocrn_no_id=ocrn_no,
-                log_reg_dt=timezone.now(),
-                log_ocrn_pstn='FILE_VALIDATION',
-                err_rsn=f'지원하지 않는 파일 형식: {file_extension}'
+            SystemLog.objects.create(
+                level='ERROR',
+                message=f'지원하지 않는 파일 형식: {file_extension}',
+                file_name=audio_file.name,
+                ip_address=client_ip
             )
             return JsonResponse({
                 'success': False,
@@ -661,12 +804,11 @@ def analyze(request):
         # 파일 크기 검증 (50MB 제한)
         max_size = 50 * 1024 * 1024  # 50MB
         if audio_file.size > max_size:
-            VoicePhishingSystemLog.objects.create(
-                log_nm='FILE_SIZE_EXCEEDED',
-                ocrn_no_id=ocrn_no,
-                log_reg_dt=timezone.now(),
-                log_ocrn_pstn='FILE_VALIDATION',
-                err_rsn=f'파일 크기 초과: {audio_file.size} bytes'
+            SystemLog.objects.create(
+                level='ERROR',
+                message=f'파일 크기 초과: {audio_file.size} bytes (최대: {max_size} bytes)',
+                file_name=audio_file.name,
+                ip_address=client_ip
             )
             return JsonResponse({
                 'success': False,
@@ -686,16 +828,15 @@ def analyze(request):
         
         # 2단계: STT 처리
         try:
-            logger.info(f"VITO STT 시작: {audio_file.name}")
+            log_system_info("INFO", f"VITO STT 시작: {audio_file.name}", audio_file.name, client_ip)
             transcript = vito_stt(audio_file)
-            logger.info(f"VITO STT 완료: {len(transcript)} 글자")
+            log_system_info("INFO", f"VITO STT 완료: {len(transcript)} 글자", audio_file.name, client_ip)
         except Exception as e:
-            VoicePhishingSystemLog.objects.create(
-                log_nm='STT_PROCESSING_ERROR',
-                ocrn_no_id=ocrn_no,
-                log_reg_dt=timezone.now(),
-                log_ocrn_pstn='STT_MODULE',
-                err_rsn=f'STT 처리 실패: {str(e)}'
+            SystemLog.objects.create(
+                level='ERROR',
+                message=f'STT 처리 실패: {str(e)}',
+                file_name=audio_file.name,
+                ip_address=client_ip
             )
             logger.error(f"VITO STT 실패: {str(e)}")
             transcript = "STT 처리에 실패했습니다."
@@ -723,9 +864,9 @@ def analyze(request):
         )
         
         # 5단계: 1차 모델 분석
-        logger.info("1차 모델 분석 시작")
+        log_system_info("INFO", "1차 모델 분석 시작", audio_file.name, client_ip)
         first_model_result = analyze_with_first_model(transcript)
-        logger.info(f"1차 모델 분석 완료: {first_model_result}")
+        log_system_info("INFO", f"1차 모델 분석 완료: 예측={first_model_result.get('prediction')}, 신뢰도={first_model_result.get('confidence', 0):.3f}", audio_file.name, client_ip)
         
         # 6단계: 2차 모델 분석 (조건부 실행)
         second_model_result = None
@@ -734,21 +875,21 @@ def analyze(request):
         dl_jdgm_yn = 'N'  # 딥러닝 판단 여부
         
         if first_model_result['prediction'] == -1:  # 보류 구간
-            logger.info("보류 구간 - 2차 모델 분석 시작")
+            log_system_info("INFO", "보류 구간 - 2차 모델 분석 시작", audio_file.name, client_ip)
             second_model_result = analyze_with_second_model(transcript)
-            logger.info(f"2차 모델 분석 완료: {second_model_result}")
+            log_system_info("INFO", f"2차 모델 분석 완료: 예측={second_model_result.get('prediction')}, 신뢰도={second_model_result.get('confidence', 0):.3f}", audio_file.name, client_ip)
             
             # 2차 모델 결과를 최종 결과로 사용
             final_prediction = second_model_result['prediction']
             final_confidence = second_model_result['confidence']
             dl_jdgm_yn = 'Y'
         else:
-            logger.info(f"1차 모델에서 즉시 판별: {first_model_result['decision_type']}")
+            log_system_info("INFO", f"1차 모델에서 즉시 판별: {first_model_result['decision_type']}", audio_file.name, client_ip)
         
         # 7단계: LLM 설명 생성 (임시)
-        logger.info("LLM 설명 생성 시작")
+        log_system_info("INFO", "LLM 설명 생성 시작", audio_file.name, client_ip)
         llm_result = generate_llm_explanation(transcript, first_model_result, second_model_result)
-        logger.info(f"LLM 설명 생성 완료: {llm_result}")
+        log_system_info("INFO", f"LLM 설명 생성 완료: 유형={llm_result.get('phishing_type', 'Unknown')}", audio_file.name, client_ip)
         
         # 8단계: ModelRegistry 등록
         # 1차 모델 등록
@@ -856,12 +997,11 @@ def analyze(request):
         )
         
         # 성공 로그
-        VoicePhishingSystemLog.objects.create(
-            log_nm='ANALYSIS_COMPLETED',
-            ocrn_no=processed_file,
-            log_reg_dt=timezone.now(),
-            log_ocrn_pstn='ANALYSIS_MODULE',
-            err_rsn=f'분석 완료: {audio_file.name} - {"피싱" if is_phishing else "정상"}'
+        SystemLog.objects.create(
+            level='INFO',
+            message=f'분석 완료: {audio_file.name} - {"피싱" if is_phishing else "정상"} (신뢰도: {final_confidence:.3f})',
+            file_name=audio_file.name,
+            ip_address=client_ip
         )
         
         # 분석 결과 반환
@@ -917,13 +1057,11 @@ def analyze(request):
         
         # 상세 오류 로그
         try:
-            VoicePhishingSystemLog.objects.create(
-                log_nm='ANALYSIS_ERROR',
-                ocrn_no_id=ocrn_no if 'ocrn_no' in locals() else None,
-                log_reg_dt=timezone.now(),
-                log_ocrn_pstn='ANALYSIS_MODULE',
-                err_rsn=f'[{error_type}] {error_message}',
-                err_cd_nm=error_code
+            SystemLog.objects.create(
+                level='ERROR',
+                message=f'[{error_type}] {error_message}',
+                file_name=locals().get('audio_file', {}).get('name', 'UNKNOWN') if 'audio_file' in locals() else 'UNKNOWN',
+                ip_address=client_ip
             )
         except Exception as log_error:
             logger.error(f"오류 로그 저장 실패: {str(log_error)}")
@@ -947,11 +1085,13 @@ def submit_feedback(request):
     client_ip = get_client_ip(request)
     
     try:
-        # JSON 데이터 파싱
+        # JSON 데이터 파싱 (UTF-8 인코딩 보장)
         try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            logger.error("피드백 데이터 JSON 파싱 실패")
+            # 요청 바디를 UTF-8로 디코딩
+            body_text = request.body.decode('utf-8')
+            data = json.loads(body_text)
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            logger.error(f"피드백 데이터 파싱 실패: {str(e)}")
             return JsonResponse({
                 'success': False,
                 'error': '잘못된 데이터 형식입니다.'
@@ -963,6 +1103,19 @@ def submit_feedback(request):
         user_prediction = data.get('user_prediction', 'N')
         comment = data.get('comment', '').strip()
         
+        # 한글 텍스트 안전하게 처리
+        if comment:
+            try:
+                # UTF-8 인코딩/디코딩 테스트
+                comment.encode('utf-8').decode('utf-8')
+            except UnicodeError:
+                logger.warning("잘못된 UTF-8 인코딩의 코멘트 감지, 안전한 문자로 대체")
+                comment = comment.encode('utf-8', errors='ignore').decode('utf-8')
+            
+            # 추가 정제: 제어 문자 제거
+            import re
+            comment = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', comment)
+        
         logger.info(f"피드백 제출 요청: rslt_id={rslt_id}, ocrn_no={ocrn_no}, prediction={user_prediction}")
         
         # 필수 정보 검증
@@ -973,18 +1126,41 @@ def submit_feedback(request):
                 'error': '분석 결과 정보가 누락되었습니다. 페이지를 새로고침 후 다시 시도해주세요.'
             }, status=400)
         
-        # 분석 결과 존재 여부 확인
+        # 분석 결과 존재 여부 확인 (더 유연한 검색)
         try:
-            inference_result = InferenceResult.objects.get(
-                rslt_id=rslt_id,
-                ocrn_no__ocrn_no=ocrn_no
-            )
-        except InferenceResult.DoesNotExist:
-            logger.error(f"해당 분석 결과를 찾을 수 없음: rslt_id={rslt_id}, ocrn_no={ocrn_no}")
+            # 먼저 rslt_id로 검색
+            inference_result = InferenceResult.objects.filter(rslt_id=rslt_id).first()
+            
+            if not inference_result:
+                # rslt_id로 못 찾으면 ocrn_no로 검색
+                inference_result = InferenceResult.objects.filter(
+                    ocrn_no__ocrn_no=ocrn_no
+                ).first()
+            
+            if not inference_result:
+                # 그래도 못 찾으면 file_id로 검색
+                inference_result = InferenceResult.objects.filter(file_id=ocrn_no).first()
+            
+            if not inference_result:
+                logger.error(f"해당 분석 결과를 찾을 수 없음: rslt_id={rslt_id}, ocrn_no={ocrn_no}")
+                logger.info(f"저장된 InferenceResult 개수: {InferenceResult.objects.count()}")
+                
+                # 최근 결과들 확인을 위한 로그
+                recent_results = InferenceResult.objects.order_by('-prdt_dt')[:5]
+                for result in recent_results:
+                    logger.info(f"최근 결과: rslt_id={result.rslt_id}, ocrn_no={result.ocrn_no.ocrn_no}, file_id={result.file_id}")
+                
+                return JsonResponse({
+                    'success': False,
+                    'error': '해당 분석 결과를 찾을 수 없습니다. 분석이 완료되지 않았거나 오류가 발생했을 수 있습니다.'
+                }, status=404)
+                
+        except Exception as db_error:
+            logger.error(f"분석 결과 검색 중 데이터베이스 오류: {str(db_error)}")
             return JsonResponse({
                 'success': False,
-                'error': '해당 분석 결과를 찾을 수 없습니다.'
-            }, status=404)
+                'error': '데이터베이스 오류가 발생했습니다.'
+            }, status=500)
         
         # 사용자 예측 값 검증
         if user_prediction not in ['Y', 'N']:
@@ -1013,8 +1189,8 @@ def submit_feedback(request):
             feedback_id = existing_feedback.prp_no
             message = '피드백이 성공적으로 업데이트되었습니다.'
         else:
-            # 새로운 피드백 생성
-            prp_no = str(uuid.uuid4())
+            # 새로운 피드백 생성 (prp_no는 20자 제한이므로 짧은 ID 사용)
+            prp_no = generate_short_id()  # 기존 함수 재사용
             feedback = Feedback.objects.create(
                 prp_no=prp_no,
                 rslt_id=rslt_id,
@@ -1026,16 +1202,15 @@ def submit_feedback(request):
             
             feedback_id = prp_no
             message = '피드백이 성공적으로 제출되었습니다.'
-            logger.info(f"새 피드백 생성: {prp_no}")
+            log_system_info("INFO", f"새 피드백 생성: {prp_no} - 사용자 판단: {user_prediction}", inference_result.ocrn_no.trsc_file_nm if inference_result.ocrn_no else "UNKNOWN", client_ip)
         
         # 시스템 로그 기록
         try:
-            VoicePhishingSystemLog.objects.create(
-                log_nm='FEEDBACK_SUBMITTED',
-                ocrn_no=inference_result.ocrn_no,
-                log_reg_dt=timezone.now(),
-                log_ocrn_pstn='FEEDBACK_MODULE',
-                err_rsn=f'피드백 제출 완료: {feedback_id} - 사용자 판단: {user_prediction}'
+            SystemLog.objects.create(
+                level='INFO',
+                message=f'피드백 제출 완료: {feedback_id} - 사용자 판단: {user_prediction}',
+                file_name=inference_result.ocrn_no.trsc_file_nm,
+                ip_address=client_ip
             )
         except Exception as log_error:
             logger.error(f"피드백 시스템 로그 기록 실패: {str(log_error)}")
@@ -1053,23 +1228,27 @@ def submit_feedback(request):
         
     except Exception as e:
         logger.error(f"피드백 제출 중 예상치 못한 오류: {str(e)}")
+        logger.error(f"오류 타입: {type(e).__name__}")
+        
+        # 스택 트레이스도 로그에 기록
+        import traceback
+        logger.error(f"스택 트레이스: {traceback.format_exc()}")
         
         # 오류 로그 기록 시도
         try:
-            VoicePhishingSystemLog.objects.create(
-                log_nm='FEEDBACK_ERROR',
-                ocrn_no_id=data.get('ocrn_no') if 'data' in locals() else None,
-                log_reg_dt=timezone.now(),
-                log_ocrn_pstn='FEEDBACK_MODULE',
-                err_rsn=f'피드백 제출 오류: {str(e)}',
-                err_cd_nm='FEEDBACK_SUBMISSION_ERROR'
+            SystemLog.objects.create(
+                level='ERROR',
+                message=f'피드백 제출 오류: {type(e).__name__}: {str(e)}',
+                file_name='FEEDBACK_ERROR',
+                ip_address=client_ip
             )
         except:
             pass  # 로그 저장 실패해도 응답은 반환
         
         return JsonResponse({
             'success': False,
-            'error': '피드백 제출 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+            'error': '피드백 제출 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+            'debug_error': str(e) if settings.DEBUG else None
         }, status=500)
 
 
@@ -1128,3 +1307,13 @@ def statistics(request):
     }
     
     return render(request, 'voice_phishing/statistics.html', context)
+
+
+def upload(request):
+    """업로드 페이지 렌더링"""
+    return render(request, 'upload.html')
+
+
+def result(request):
+    """결과 페이지 렌더링"""
+    return render(request, 'result.html')

@@ -18,6 +18,9 @@ const errorMessage = document.getElementById("errorMessage")
 
 // 페이지 초기화
 function initializeResult() {
+  // 피드백 폼 초기화 (새로운 분석을 위해)
+  resetFeedbackForm()
+  
   // Task ID 가져오기
   currentTaskId = getUrlParameter("taskId") || getFromStorage("currentTaskId")
 
@@ -33,29 +36,55 @@ function initializeResult() {
 // 분석 결과 로드
 function loadAnalysisResult() {
   // 로컬 스토리지에서 결과 가져오기
-  analysisResult = getFromStorage("analysisResult")
-
-  if (analysisResult) {
-    displayResult(analysisResult)
+  const analysisResultStr = localStorage.getItem("analysisResult")
+  
+  if (analysisResultStr) {
+    try {
+      analysisResult = JSON.parse(analysisResultStr)
+      console.log('로드된 분석 결과:', analysisResult)
+      
+      // 실제 API 결과인지 확인
+      if (analysisResult.success && (analysisResult.rslt_id || analysisResult.ocrn_no)) {
+        console.log('실제 분석 결과 사용')
+        displayResult(analysisResult)
+      } else {
+        console.warn('불완전한 분석 결과, 재분석 필요')
+        showError("분석 결과가 불완전합니다. 다시 분석해주세요.")
+      }
+    } catch (error) {
+      console.error('분석 결과 파싱 오류:', error)
+      showError("분석 결과를 불러오는 중 오류가 발생했습니다.")
+    }
   } else {
-    // 결과가 없으면 시뮬레이션으로 생성
-    setTimeout(() => {
-      generateMockResult()
-    }, 2000)
+    console.log('저장된 분석 결과가 없음')
+    showError("분석 결과를 찾을 수 없습니다. 먼저 음성 파일을 분석해주세요.")
   }
 }
 
-// 목업 결과 생성
+// 목업 결과 생성 (개발용 - 실제 운영에서는 사용하지 않음)
 function generateMockResult() {
+  // 운영 환경에서는 목업 결과를 생성하지 않음
+  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    showError("분석 결과를 찾을 수 없습니다. 먼저 음성 파일을 분석해주세요.")
+    return
+  }
+  
+  console.warn('개발 모드: Mock 결과 생성')
   const isPhishing = Math.random() < 0.3 // 30% 확률로 피싱
 
   const mockResult = {
+    success: true,
     verdict: isPhishing ? "phishing" : "normal",
     type: isPhishing ? getRandomPhishingType() : "정상 통화",
     confidence: isPhishing ? Math.round(75 + Math.random() * 20) : Math.round(85 + Math.random() * 15),
     warning: isPhishing ? getPhishingWarning() : getNormalMessage(),
     analysisStage: Math.random() < 0.3 ? "1차 ML" : "1차 ML + 2차 DL",
     completedAt: new Date().toISOString(),
+    // 피드백을 위한 가짜 ID들 (실제 DB에 존재하지 않으므로 피드백 실패)
+    rslt_id: "mock_" + Date.now(),
+    ocrn_no: "mock_" + Date.now(),
+    warning_message: isPhishing ? getPhishingWarning() : getNormalMessage(),
+    is_phishing: isPhishing
   }
 
   displayResult(mockResult)
@@ -92,8 +121,13 @@ function displayResult(result) {
   // 결과 카드 표시
   resultCard.style.display = "block"
 
+  // API 응답 형식에 맞게 데이터 추출
+  const isPhishing = result.is_phishing || (result.verdict === "phishing")
+  const phishingTypeText = result.type || result.phishing_type || "정상통화"
+  const confidenceValue = result.confidence || (result.confidence_level * 100) || 0
+  const warningTextContent = result.warning_message || result.warning || "분석 완료"
+
   // 결과 배지 설정
-  const isPhishing = result.verdict === "phishing"
   resultBadge.className = `result-badge ${isPhishing ? "phishing" : "normal"}`
   resultBadge.innerHTML = `
         <i class="fas ${isPhishing ? "fa-exclamation-triangle" : "fa-check-circle"}"></i>
@@ -104,12 +138,17 @@ function displayResult(result) {
   finalResult.textContent = isPhishing ? "보이스피싱" : "정상"
   finalResult.className = `detail-value ${isPhishing ? "phishing" : "normal"}`
 
-  phishingType.textContent = result.type
-  confidence.textContent = `${result.confidence}%`
+  phishingType.textContent = phishingTypeText
+  confidence.textContent = `${Math.round(confidenceValue * 100)}%`
 
   // 경고 메시지 설정
   warningMessage.className = `warning-message ${isPhishing ? "phishing" : "normal"}`
-  warningText.textContent = `"${result.warning}"`
+  warningText.textContent = `"${warningTextContent}"`
+  
+  console.log('표시된 결과:', { isPhishing, phishingTypeText, confidenceValue, warningTextContent })
+  
+  // 피드백 버튼 표시
+  showFeedbackButton()
 }
 
 // 오류 표시
@@ -137,4 +176,391 @@ function getUrlParameter(name) {
 // getFromStorage 함수 선언
 function getFromStorage(key) {
   return localStorage.getItem(key)
+}
+
+// 피드백 관련 함수들
+let currentAnalysisData = null
+
+// 피드백 버튼 표시
+function showFeedbackButton() {
+  const feedbackBtn = document.getElementById('feedbackBtn')
+  if (feedbackBtn) {
+    feedbackBtn.style.display = 'inline-flex'
+  }
+}
+
+// 피드백 섹션 표시
+function showFeedback() {
+  const feedbackSection = document.getElementById('feedbackSection')
+  if (feedbackSection) {
+    feedbackSection.style.display = 'block'
+    feedbackSection.scrollIntoView({ behavior: 'smooth' })
+  }
+  
+  // 문자 카운터 초기화 (중복 이벤트 방지)
+  const textarea = document.getElementById('feedbackComment')
+  const charCount = document.getElementById('charCount')
+  if (textarea && charCount) {
+    // 기존 이벤트 리스너 제거 (중복 방지)
+    textarea.removeEventListener('input', updateCharCount)
+    // 새 이벤트 리스너 추가
+    textarea.addEventListener('input', updateCharCount)
+    // 초기 카운트 설정
+    charCount.textContent = textarea.value.length
+  }
+}
+
+// 문자 카운터 업데이트 함수 (분리)
+function updateCharCount() {
+  const charCount = document.getElementById('charCount')
+  if (charCount) {
+    charCount.textContent = this.value.length
+    
+    // 글자수 제한 시각적 표시
+    if (this.value.length > 950) {
+      charCount.style.color = '#ef4444' // 빨간색
+    } else if (this.value.length > 800) {
+      charCount.style.color = '#f59e0b' // 주황색
+    } else {
+      charCount.style.color = '#6b7280' // 기본 회색
+    }
+  }
+}
+
+// 피드백 섹션 숨기기
+function hideFeedback() {
+  const feedbackSection = document.getElementById('feedbackSection')
+  if (feedbackSection) {
+    feedbackSection.style.display = 'none'
+  }
+  
+  // 폼 초기화
+  resetFeedbackForm()
+}
+
+// 피드백 폼 완전 초기화
+function resetFeedbackForm() {
+  console.log('피드백 폼 완전 초기화 시작')
+  
+  // 라디오 버튼 초기화 (모든 가능한 name 속성 대상)
+  const radioButtons = document.querySelectorAll('input[name="feedback"], input[name="feedback-accuracy"]')
+  radioButtons.forEach(radio => {
+    radio.checked = false
+    radio.disabled = false
+  })
+  
+  // 텍스트 영역 초기화 (모든 가능한 ID 대상)
+  const textareas = ['feedbackComment', 'feedback-comment']
+  textareas.forEach(id => {
+    const textarea = document.getElementById(id)
+    if (textarea) {
+      textarea.value = ''
+      textarea.disabled = false
+    }
+  })
+  
+  // 문자 카운터 초기화
+  const charCount = document.getElementById('charCount')
+  if (charCount) {
+    charCount.textContent = '0'
+    charCount.style.color = '#6b7280' // 기본 회색으로 초기화
+  }
+  
+  // 제출 버튼 초기화 (모든 가능한 ID 대상)
+  const submitBtns = ['submitFeedbackBtn', 'submit-feedback-btn']
+  submitBtns.forEach(id => {
+    const submitBtn = document.getElementById(id)
+    if (submitBtn) {
+      submitBtn.disabled = false
+      submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> 피드백 제출'
+      submitBtn.style.backgroundColor = ''
+    }
+  })
+  
+  // 피드백 섹션 숨기기
+  const feedbackSection = document.getElementById('feedbackSection')
+  if (feedbackSection) {
+    feedbackSection.style.display = 'none'
+  }
+  
+  // 피드백 버튼 다시 표시
+  const feedbackBtn = document.getElementById('feedbackBtn')
+  if (feedbackBtn) {
+    feedbackBtn.style.display = 'inline-flex'
+  }
+  
+  // 모든 성공/에러 메시지 제거
+  const messages = ['feedbackSuccess', 'feedbackError']
+  messages.forEach(id => {
+    const msg = document.getElementById(id)
+    if (msg) {
+      msg.remove()
+    }
+  })
+  
+  // 기존 메시지들도 제거
+  const existingMessages = document.querySelectorAll('.feedback-success, .feedback-error')
+  existingMessages.forEach(msg => msg.remove())
+  
+  console.log('피드백 폼 완전 초기화 완료')
+}
+
+// 피드백 제출
+async function submitFeedback() {
+  try {
+    // 폼 데이터 수집
+    const feedbackValue = document.querySelector('input[name="feedback"]:checked')
+    const commentText = document.getElementById('feedbackComment').value.trim()
+    
+    if (!feedbackValue) {
+      showFeedbackError('분석 결과에 대한 의견을 선택해주세요.')
+      return
+    }
+    
+    // 댓글 길이 검증
+    if (commentText.length > 1000) {
+      showFeedbackError('의견은 1000자 이하로 작성해주세요.')
+      return
+    }
+    
+    // 분석 결과에서 필요한 정보 추출
+    const urlParams = new URLSearchParams(window.location.search)
+    const taskId = urlParams.get('taskId') || currentTaskId
+    
+    // 로컬 스토리지에서 분석 결과 가져오기
+    const analysisResultStr = localStorage.getItem('analysisResult')
+    const analysisResult = analysisResultStr ? JSON.parse(analysisResultStr) : {}
+    
+    console.log('로컬스토리지 분석 결과:', analysisResult)
+    console.log('사용 가능한 키:', Object.keys(analysisResult))
+    console.log('URL taskId:', taskId)
+    
+    // 실제 분석 결과에서 rslt_id와 ocrn_no 가져오기 (다양한 형태 지원)
+    let rslt_id = analysisResult.rslt_id || analysisResult.result_id || taskId
+    let ocrn_no = analysisResult.ocrn_no || analysisResult.occurrence_no || analysisResult.task_id || taskId
+    
+    // 추가 데이터 검증 및 상세 로깅
+    console.log('추출된 데이터:')
+    console.log('  rslt_id 후보들:', {
+      'analysisResult.rslt_id': analysisResult.rslt_id,
+      'analysisResult.result_id': analysisResult.result_id,
+      'taskId': taskId
+    })
+    console.log('  ocrn_no 후보들:', {
+      'analysisResult.ocrn_no': analysisResult.ocrn_no,
+      'analysisResult.occurrence_no': analysisResult.occurrence_no,
+      'analysisResult.task_id': analysisResult.task_id,
+      'taskId': taskId
+    })
+    
+    if (!rslt_id || !ocrn_no) {
+      console.warn('필요한 ID 정보 부족, URL에서 가져오기 시도')
+      rslt_id = rslt_id || taskId
+      ocrn_no = ocrn_no || taskId
+    }
+    
+    // 데이터 유효성 최종 검증
+    if (!rslt_id || !ocrn_no || rslt_id === 'undefined' || ocrn_no === 'undefined') {
+      showFeedbackError('분석 결과 정보를 찾을 수 없습니다. 페이지를 새로고침하고 다시 분석해주세요.')
+      return
+    }
+    
+    // Mock 데이터 감지
+    if (rslt_id.startsWith('mock_') || ocrn_no.startsWith('mock_')) {
+      showFeedbackError('개발 모드에서는 피드백을 제출할 수 없습니다. 실제 음성 파일로 분석 후 시도해주세요.')
+      return
+    }
+    
+    console.log('최종 피드백 데이터:', { 
+      rslt_id, 
+      ocrn_no, 
+      user_prediction: feedbackValue.value, 
+      comment: commentText,
+      available_data: Object.keys(analysisResult)
+    })
+    
+    const feedbackData = {
+      rslt_id: rslt_id,
+      ocrn_no: ocrn_no,
+      user_prediction: feedbackValue.value,
+      comment: commentText
+    }
+    
+    // 제출 버튼 비활성화
+    const submitBtn = document.getElementById('submitFeedbackBtn')
+    const originalText = submitBtn.innerHTML
+    submitBtn.disabled = true
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 제출 중...'
+    
+    // 서버에 피드백 전송
+    const response = await fetch('/submit_feedback/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'X-CSRFToken': getCsrfToken()
+      },
+      body: JSON.stringify(feedbackData)
+    })
+    
+    console.log('피드백 응답 상태:', response.status)
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: 서버 오류가 발생했습니다.`)
+    }
+    
+    const result = await response.json()
+    console.log('피드백 응답 결과:', result)
+    
+    if (result.success) {
+      // 성공 메시지 표시
+      showFeedbackSuccess(result.message || '피드백이 성공적으로 제출되었습니다.')
+      
+      // 폼 숨기기
+      setTimeout(() => {
+        hideFeedback()
+      }, 3000)
+    } else {
+      throw new Error(result.error || '피드백 제출에 실패했습니다.')
+    }
+    
+  } catch (error) {
+    console.error('피드백 제출 오류:', error)
+    
+    // 친화적인 오류 메시지 표시
+    let userMessage = '피드백 제출 중 오류가 발생했습니다.'
+    
+    if (error.message.includes('HTTP 404')) {
+      userMessage = '분석 결과를 찾을 수 없습니다. 페이지를 새로고침 후 다시 시도해주세요.'
+    } else if (error.message.includes('HTTP 500')) {
+      userMessage = '서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+    } else if (error.message.includes('네트워크') || error.name === 'TypeError') {
+      userMessage = '네트워크 연결을 확인하고 다시 시도해주세요.'
+    } else if (error.message.includes('UTF-8') || error.message.includes('인코딩')) {
+      userMessage = '텍스트 입력에 문제가 있습니다. 특수문자를 제거하고 다시 시도해주세요.'
+    } else if (error.message) {
+      userMessage = error.message
+    }
+    
+    showFeedbackError(userMessage)
+  } finally {
+    // 제출 버튼 복원
+    const submitBtn = document.getElementById('submitFeedbackBtn')
+    if (submitBtn) {
+      submitBtn.disabled = false
+      submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> 피드백 제출'
+    }
+  }
+}
+
+// 피드백 에러 메시지 표시
+function showFeedbackError(message) {
+  // 기존 에러 메시지 제거
+  const existingError = document.getElementById('feedbackError')
+  if (existingError) {
+    existingError.remove()
+  }
+  
+  // 새 에러 메시지 생성
+  const errorDiv = document.createElement('div')
+  errorDiv.id = 'feedbackError'
+  errorDiv.className = 'feedback-error'
+  errorDiv.innerHTML = `
+    <i class="fas fa-exclamation-triangle"></i>
+    <span>${message}</span>
+  `
+  
+  // 피드백 섹션에 추가
+  const feedbackForm = document.querySelector('.feedback-form')
+  if (feedbackForm) {
+    feedbackForm.insertBefore(errorDiv, feedbackForm.firstChild)
+    
+    // 3초 후 자동 제거
+    setTimeout(() => {
+      if (errorDiv.parentNode) {
+        errorDiv.remove()
+      }
+    }, 3000)
+  } else {
+    // 대체: alert 사용
+    alert(message)
+  }
+}
+
+// 피드백 성공 메시지 표시
+function showFeedbackSuccess(message = '피드백이 성공적으로 제출되었습니다.') {
+  // 기존 성공 메시지 제거
+  const existingSuccess = document.getElementById('feedbackSuccess')
+  if (existingSuccess) {
+    existingSuccess.remove()
+  }
+  
+  // 새 성공 메시지 생성
+  const successDiv = document.createElement('div')
+  successDiv.id = 'feedbackSuccess'
+  successDiv.className = 'feedback-success'
+  successDiv.style.cssText = `
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    margin: 16px 0;
+    background-color: #10b981;
+    color: white;
+    border-radius: 6px;
+    font-size: 14px;
+    animation: slideIn 0.3s ease-out;
+  `
+  successDiv.innerHTML = `
+    <i class="fas fa-check-circle"></i>
+    <span>${message}</span>
+  `
+  
+  // 피드백 섹션에 추가
+  const feedbackForm = document.querySelector('.feedback-form')
+  if (feedbackForm) {
+    feedbackForm.insertBefore(successDiv, feedbackForm.firstChild)
+    
+    // 5초 후 자동 제거
+    setTimeout(() => {
+      if (successDiv.parentNode) {
+        successDiv.remove()
+      }
+    }, 5000)
+  } else {
+    // 대체: alert 사용
+    alert(message)
+  }
+}
+
+// CSRF 토큰 가져오기
+function getCsrfToken() {
+  const cookies = document.cookie.split(';')
+  for (let cookie of cookies) {
+    const [name, value] = cookie.trim().split('=')
+    if (name === 'csrftoken') {
+      return value
+    }
+  }
+  
+  // 메타 태그에서 찾기
+  const csrfMeta = document.querySelector('meta[name="csrf-token"]')
+  if (csrfMeta) {
+    return csrfMeta.getAttribute('content')
+  }
+  
+  return ''
+}
+
+// 다시 분석 버튼 클릭 시 피드백 폼 초기화
+function retryAnalysis() {
+  console.log('다시 분석 버튼 클릭 - 피드백 폼 초기화')
+  resetFeedbackForm()
+  window.location.href = '/'
+}
+
+// 홈으로 이동 시 피드백 폼 초기화
+function goHome() {
+  console.log('홈으로 버튼 클릭 - 피드백 폼 초기화')
+  resetFeedbackForm()
+  window.location.href = '/'
 }

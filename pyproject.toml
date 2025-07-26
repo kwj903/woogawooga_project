@@ -44,4 +44,5 @@ dependencies = [
     "whisperx>=3.4.2",
     "wordcloud>=1.9.4",
     "xgboost>=3.0.2",
+    "openai>=1.97.1",
 ]

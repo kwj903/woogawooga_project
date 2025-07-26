@@ -138,18 +138,73 @@ function onUploadComplete() {
 }
 
 // 분석 시작
-function startAnalysis() {
+async function startAnalysis() {
   if (!selectedFile) {
     showStatusMessage(statusMessage, "먼저 파일을 업로드해주세요.", "error")
     return
   }
 
-  // Task ID 생성 및 저장
-  const taskId = generateTaskId()
-  saveToStorage("currentTaskId", taskId)
+  // UI 업데이트
+  analyzeBtn.disabled = true
+  analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 분석 중...'
+  
+  try {
+    // FormData 생성
+    const formData = new FormData()
+    formData.append('audio_file', selectedFile)
+    
+    // CSRF 토큰 가져오기
+    const csrfToken = getCsrfToken()
+    
+    // 실제 분석 API 호출
+    const response = await fetch('/analyze/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken
+      },
+      body: formData
+    })
+    
+    const result = await response.json()
+    
+    if (result.success) {
+      // 분석 결과를 localStorage에 저장
+      saveToStorage("analysisResult", result)
+      saveToStorage("currentTaskId", result.ocrn_no)
+      
+      // 결과 페이지로 이동
+      window.location.href = `/result/?taskId=${result.ocrn_no}`
+    } else {
+      throw new Error(result.error || '분석에 실패했습니다.')
+    }
+    
+  } catch (error) {
+    console.error('분석 오류:', error)
+    showStatusMessage(statusMessage, `분석 중 오류가 발생했습니다: ${error.message}`, "error")
+    
+    // 버튼 복원
+    analyzeBtn.disabled = false
+    analyzeBtn.innerHTML = '<i class="fas fa-search"></i> 분석 시작'
+  }
+}
 
-  // 분석 페이지로 이동
-  window.location.href = `/analysis/?taskId=${taskId}`
+// CSRF 토큰 가져오기
+function getCsrfToken() {
+  const cookies = document.cookie.split(';')
+  for (let cookie of cookies) {
+    const [name, value] = cookie.trim().split('=')
+    if (name === 'csrftoken') {
+      return value
+    }
+  }
+  
+  // 메타 태그에서 찾기
+  const csrfMeta = document.querySelector('meta[name="csrf-token"]')
+  if (csrfMeta) {
+    return csrfMeta.getAttribute('content')
+  }
+  
+  return ''
 }
 
 // 페이지 로드 시 초기화

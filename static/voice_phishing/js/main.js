@@ -625,7 +625,7 @@ class VoicePhishingDetector {
       const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value
       
       // 서버로 피드백 전송
-      const response = await fetch('/feedback/', {
+      const response = await fetch('/submit_feedback/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -640,6 +640,7 @@ class VoicePhishingDetector {
         this.showFeedbackStatus('피드백이 성공적으로 제출되었습니다. 감사합니다!', 'success')
         
         // 폼 비활성화
+        const radioButtons = document.querySelectorAll('input[name="feedback"]')
         radioButtons.forEach(radio => radio.disabled = true)
         commentTextarea.disabled = true
         

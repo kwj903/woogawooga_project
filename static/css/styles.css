@@ -831,3 +831,260 @@ body {
     grid-column: span 2;
   }
 }
+
+/* 피드백 섹션 스타일 */
+.feedback-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+}
+
+.feedback-section h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #1e293b;
+}
+
+.feedback-description {
+  color: #64748b;
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.feedback-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.feedback-question {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.feedback-label {
+  font-weight: 500;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.feedback-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 0.75rem;
+  border: 2px solid #d1d5db;
+  border-radius: 0.5rem;
+  background: white;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.radio-option:hover {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.radio-option input[type="radio"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #3b82f6;
+}
+
+.radio-option input[type="radio"]:checked + .radio-text {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.radio-option:has(input[type="radio"]:checked) {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.radio-text {
+  font-size: 0.875rem;
+  color: #374151;
+  transition: color 0.2s ease;
+}
+
+.feedback-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.feedback-comment textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 100px;
+  max-height: 200px;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.feedback-comment textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.feedback-comment textarea::placeholder {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.char-count {
+  text-align: right;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.feedback-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.feedback-success {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #ecfdf5;
+  border: 1px solid #10b981;
+  border-radius: 0.375rem;
+  color: #047857;
+  font-size: 0.875rem;
+}
+
+.feedback-success i {
+  color: #10b981;
+}
+
+.feedback-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #fef2f2;
+  border: 1px solid #ef4444;
+  border-radius: 0.375rem;
+  color: #b91c1c;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+  animation: slideIn 0.3s ease-out;
+}
+
+.feedback-error i {
+  color: #ef4444;
+}
+
+/* 피드백 성공 메시지 스타일 */
+.feedback-success {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin: 16px 0;
+  background-color: #10b981;
+  color: white;
+  border-radius: 6px;
+  font-size: 14px;
+  animation: slideIn 0.3s ease-out;
+  border: 1px solid #059669;
+  box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);
+}
+
+.feedback-success i {
+  color: #d1fae5;
+  font-size: 16px;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 버튼 보조 스타일 */
+.btn.btn-secondary {
+  background: #6b7280;
+  border-color: #6b7280;
+  color: white;
+}
+
+.btn.btn-secondary:hover {
+  background: #4b5563;
+  border-color: #4b5563;
+}
+
+.btn.btn-secondary:focus {
+  box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.3);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn:disabled:hover {
+  background: inherit;
+  border-color: inherit;
+  transform: none;
+}
+
+/* 반응형 피드백 스타일 */
+@media (min-width: 640px) {
+  .feedback-options {
+    flex-direction: row;
+    gap: 1rem;
+  }
+  
+  .radio-option {
+    flex: 1;
+    justify-content: center;
+  }
+  
+  .feedback-buttons {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 639px) {
+  .feedback-buttons {
+    flex-direction: column;
+  }
+  
+  .feedback-buttons .btn {
+    width: 100%;
+  }
+}

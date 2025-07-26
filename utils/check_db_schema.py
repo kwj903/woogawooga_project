@@ -5,9 +5,13 @@ Django shell에서 실행: python manage.py shell < check_db_schema.py
 """
 
 import os
+import sys
 import django
 from django.conf import settings
 from django.db import connection
+
+# 상위 디렉토리를 Python 경로에 추가
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Django 설정 로드
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
@@ -18,7 +22,7 @@ def check_database_schema():
     cursor = connection.cursor()
     
     print("=" * 60)
-    print("🔍 데이터베이스 스키마 확인")
+    print("[검색] 데이터베이스 스키마 확인")
     print("=" * 60)
     
     # InferenceResult 테이블 구조 확인
@@ -26,7 +30,7 @@ def check_database_schema():
         cursor.execute("DESCRIBE InferenceResult")
         columns = cursor.fetchall()
         
-        print("\n📋 InferenceResult 테이블 구조:")
+        print("\n[정보] InferenceResult 테이블 구조:")
         print("-" * 50)
         print(f"{'필드명':<20} {'타입':<15} {'NULL':<5} {'키':<5} {'기본값':<10}")
         print("-" * 50)
@@ -42,21 +46,21 @@ def check_database_schema():
             
             # file_id 필드 특별 확인
             if field_name == 'file_id':
-                print(f"🎯 file_id 필드: {field_type}")
+                print(f"[대상] file_id 필드: {field_type}")
                 if 'varchar(20)' in field_type.lower():
-                    print("⚠️  문제 발견: file_id가 여전히 20자로 제한되어 있습니다!")
+                    print("[WARNING]  문제 발견: file_id가 여전히 20자로 제한되어 있습니다!")
                 elif 'varchar(50)' in field_type.lower():
-                    print("✅ file_id가 50자로 올바르게 설정되었습니다.")
+                    print("[OK] file_id가 50자로 올바르게 설정되었습니다.")
                     
     except Exception as e:
-        print(f"❌ 테이블 구조 확인 실패: {str(e)}")
+        print(f"[ERROR] 테이블 구조 확인 실패: {str(e)}")
     
     # Migration 적용 상태 확인
     try:
         cursor.execute("SELECT app, name, applied FROM django_migrations WHERE app = 'woogawooga' ORDER BY applied DESC LIMIT 10")
         migrations = cursor.fetchall()
         
-        print(f"\n🔄 최근 Migration 기록:")
+        print(f"\n[처리] 최근 Migration 기록:")
         print("-" * 50)
         for migration in migrations:
             app, name, applied = migration
@@ -67,15 +71,15 @@ def check_database_schema():
         count = cursor.fetchone()[0]
         
         if count > 0:
-            print("✅ 0003_alter_inferenceresult_file_id migration이 적용되었습니다.")
+            print("[OK] 0003_alter_inferenceresult_file_id migration이 적용되었습니다.")
         else:
-            print("⚠️  0003_alter_inferenceresult_file_id migration이 적용되지 않았습니다!")
+            print("[WARNING]  0003_alter_inferenceresult_file_id migration이 적용되지 않았습니다!")
             
     except Exception as e:
-        print(f"❌ Migration 기록 확인 실패: {str(e)}")
+        print(f"[ERROR] Migration 기록 확인 실패: {str(e)}")
     
     # 현재 데이터베이스 연결 정보
-    print(f"\n🔗 데이터베이스 연결 정보:")
+    print(f"\n[연결] 데이터베이스 연결 정보:")
     print(f"   엔진: {settings.DATABASES['default']['ENGINE']}")
     print(f"   데이터베이스: {settings.DATABASES['default']['NAME']}")
     print(f"   호스트: {settings.DATABASES['default']['HOST']}")
@@ -87,7 +91,7 @@ def test_uuid_length():
     """UUID 길이 테스트"""
     import uuid
     
-    print(f"\n📏 UUID 길이 테스트:")
+    print(f"\n[측정] UUID 길이 테스트:")
     print("-" * 30)
     
     test_uuid = str(uuid.uuid4())

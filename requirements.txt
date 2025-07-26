@@ -19,6 +19,9 @@ pandas>=2.0.0
 # 자연어 처리
 kiwipiepy>=0.15.0
 
+# AI/LLM 모델
+openai>=1.0.0
+
 # LightGBM 모델
 lightgbm>=4.0.0
 
