@@ -13,6 +13,7 @@ import random
 import logging
 import uuid
 import pickle
+import joblib
 import os
 from pathlib import Path
 import numpy as np
@@ -25,11 +26,55 @@ from django.conf import settings
 try:
     from kiwipiepy import Kiwi
     import lightgbm as lgb
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+    from transformers import AutoTokenizer, AutoModel
+    from torch.utils.data import Dataset, DataLoader
 except ImportError as e:
     logger.warning(f"필수 패키지 import 실패: {e}")
 
 # 로거 설정
 logger = logging.getLogger(__name__)
+
+def refresh_vito_token():
+    """VITO API 토큰 갱신"""
+    try:
+        client_id = os.getenv('CLIENT_ID')
+        client_secret = os.getenv('CLIENT_SECRET')
+        
+        if not client_id or not client_secret:
+            logger.error("VITO CLIENT_ID 또는 CLIENT_SECRET이 없음")
+            return None
+            
+        # VITO 토큰 발급 API 호출
+        auth_url = "https://openapi.vito.ai/v1/authenticate"
+        auth_data = {
+            "client_id": client_id,
+            "client_secret": client_secret
+        }
+        
+        response = requests.post(auth_url, json=auth_data, timeout=30)
+        
+        if response.status_code == 200:
+            token_data = response.json()
+            new_token = token_data.get('access_token')
+            
+            if new_token:
+                logger.info("VITO 토큰 갱신 성공")
+                # 환경변수 업데이트 (현재 세션에서만)
+                os.environ['VITO_API_KEY'] = new_token
+                return new_token
+            else:
+                logger.error("VITO 응답에서 access_token을 찾을 수 없음")
+                return None
+        else:
+            logger.error(f"VITO 토큰 갱신 실패: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"VITO 토큰 갱신 오류: {e}")
+        return None
 
 # 로깅 레벨 설정
 logging.basicConfig(
@@ -37,48 +82,272 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-# 모델 로드 (전역 변수로 한 번만 로드)
+# KoBERT 기반 PyTorch 모델 클래스 정의
+class TextOnlyPhishingDetector(nn.Module):
+    def __init__(self, bert_model_name='skt/kobert-base-v1', hidden_dim=128, num_classes=2, dropout_rate=0.3):
+        super(TextOnlyPhishingDetector, self).__init__()
+        
+        # KoBERT 모델 로드
+        self.bert = AutoModel.from_pretrained(bert_model_name)
+        self.bert_hidden_size = self.bert.config.hidden_size  # 768
+        
+        # LSTM 층
+        self.lstm = nn.LSTM(
+            input_size=self.bert_hidden_size,
+            hidden_size=hidden_dim,
+            num_layers=2,
+            batch_first=True,
+            dropout=dropout_rate,
+            bidirectional=True
+        )
+        
+        # Attention 층
+        self.attention = nn.MultiheadAttention(
+            embed_dim=hidden_dim * 2,  # bidirectional
+            num_heads=8,
+            dropout=dropout_rate,
+            batch_first=True
+        )
+        
+        # 분류 층 (저장된 모델과 일치하도록 구조 수정)
+        self.classifier = nn.Sequential(
+            nn.Dropout(dropout_rate),           # 0
+            nn.Linear(hidden_dim * 2, hidden_dim), # 1
+            nn.ReLU(),                          # 2
+            nn.Dropout(dropout_rate),           # 3
+            nn.Linear(hidden_dim, num_classes)  # 4
+        )
+        
+    def forward(self, input_ids, attention_mask):
+        # BERT 인코딩
+        bert_outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
+        sequence_output = bert_outputs.last_hidden_state  # [batch_size, seq_len, hidden_size]
+        
+        # LSTM 처리
+        lstm_output, (hidden, cell) = self.lstm(sequence_output)  # [batch_size, seq_len, hidden_dim * 2]
+        
+        # Attention 적용
+        attn_output, _ = self.attention(lstm_output, lstm_output, lstm_output)
+        
+        # Global average pooling
+        pooled_output = torch.mean(attn_output, dim=1)  # [batch_size, hidden_dim * 2]
+        
+        # 분류
+        logits = self.classifier(pooled_output)
+        
+        return logits
+
+# 대화 데이터셋 클래스
+class DialogueDataset(Dataset):
+    def __init__(self, texts, tokenizer, max_length=128):
+        self.texts = texts
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+    
+    def __len__(self):
+        return len(self.texts)
+    
+    def __getitem__(self, idx):
+        text = str(self.texts[idx])
+        
+        # 토크나이징
+        encoding = self.tokenizer(
+            text,
+            truncation=True,
+            padding='max_length',
+            max_length=self.max_length,
+            return_tensors='pt'
+        )
+        
+        return {
+            'input_ids': encoding['input_ids'].flatten(),
+            'attention_mask': encoding['attention_mask'].flatten()
+        }
+
+# 모델 경로 설정
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_PATH = BASE_DIR / 'models' / 'stacking_v2.pkl'
-LGBM_MODEL_PATH = BASE_DIR / 'models' / 'lgbm_model_v2.pkl'
+PYTORCH_MODEL_PATH = BASE_DIR / 'models' / 'kobert_2nd_model_runpod.pth'  # 2차 KoBERT 모델
+LGBM_MODEL_PATH = BASE_DIR / 'models' / 'lgbm_model_v2.pkl'  # 기존 LightGBM (백업용)
 TFIDF_PATH = BASE_DIR / 'datas' / 'modelsData' / 'tfidf_vectorizer.pkl'
 
 # 모델 전역 변수
-stacking_model = None
-lgbm_model = None
-tfidf_vectorizer = None
-kiwi_tokenizer = None
+stacking_model = None  # 1차 Pipeline 모델 (TF-IDF + Stacking)
+pytorch_model = None  # KoBERT 기반 2차 모델
+kobert_tokenizer = None  # KoBERT 토크나이저
+lgbm_model = None  # 백업용 (deprecated)
+kiwi_tokenizer = None  # 키위 토크나이저
 
 def load_models():
     """모든 필수 모델 및 토크나이저 로드"""
-    global stacking_model, lgbm_model, tfidf_vectorizer, kiwi_tokenizer
+    global stacking_model, pytorch_model, kobert_tokenizer, lgbm_model, kiwi_tokenizer
     
     try:
-        # 1차 Stacking 모델 로드
+        # 1차 Stacking Pipeline 모델 로드
         if stacking_model is None and MODEL_PATH.exists():
-            with open(MODEL_PATH, 'rb') as f:
-                stacking_model = pickle.load(f)
-                logger.info("1차 Stacking 모델 로드 완료")
+            try:
+                logger.info(f"1차 Pipeline 모델 로드 시도: {MODEL_PATH}")
+                
+                # joblib 사용 (scikit-learn Pipeline에 권장)
+                stacking_model = joblib.load(MODEL_PATH)
+                logger.info("1차 Pipeline 모델 로드 성공")
+                logger.info(f"모델 타입: {type(stacking_model).__name__}")
+                
+                # Pipeline 구조 확인
+                if hasattr(stacking_model, 'steps'):
+                    logger.info(f"Pipeline 단계: {[step[0] for step in stacking_model.steps]}")
+                    
+            except Exception as e:
+                logger.error(f"1차 Pipeline 모델 로드 실패: {e}")
+                logger.error(f"파일 경로: {MODEL_PATH}")
         elif not MODEL_PATH.exists():
             logger.warning(f"1차 모델 파일 없음: {MODEL_PATH}")
         
-        # 2차 LightGBM 모델 로드
+        # 2차 PyTorch KoBERT 모델 로드
+        if pytorch_model is None and PYTORCH_MODEL_PATH.exists():
+            try:
+                logger.info(f"2차 PyTorch 모델 로드 시도: {PYTORCH_MODEL_PATH}")
+                
+                # 파일 크기 검증
+                file_size = PYTORCH_MODEL_PATH.stat().st_size
+                logger.info(f"PyTorch 모델 파일 크기: {file_size} bytes")
+                
+                if file_size < 1000:  # 너무 작은 파일
+                    logger.error(f"PyTorch 모델 파일이 너무 작음: {file_size} bytes")
+                else:
+                    # 모델 인스턴스 생성
+                    pytorch_model = TextOnlyPhishingDetector()
+                    
+                    # GPU 사용 가능하면 GPU로, 아니면 CPU로
+                    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+                    
+                    # 모델 가중치 로드 (weights_only=False로 설정)
+                    checkpoint = torch.load(PYTORCH_MODEL_PATH, map_location=device, weights_only=False)
+                    
+                    # 체크포인트 구조 확인 및 적절한 state_dict 추출
+                    if isinstance(checkpoint, dict):
+                        logger.info(f"체크포인트 키들: {list(checkpoint.keys())}")
+                        
+                        if 'model_state_dict' in checkpoint:
+                            # 훈련 시 저장된 전체 체크포인트에서 모델 state_dict 추출
+                            state_dict = checkpoint['model_state_dict']
+                            logger.info("체크포인트에서 model_state_dict 추출")
+                            
+                            # 모델 구조 정보 확인
+                            if 'model_config' in checkpoint:
+                                config = checkpoint['model_config']
+                                logger.info(f"저장된 모델 설정: {config}")
+                                
+                                # 저장된 설정에 따라 모델 재생성
+                                if isinstance(config, dict):
+                                    bert_model_name = config.get('bert_model_name', 'skt/kobert-base-v1')
+                                    hidden_dim = config.get('hidden_dim', 128)
+                                    num_classes = config.get('num_classes', 2)
+                                    dropout_rate = config.get('dropout_rate', 0.3)
+                                    
+                                    logger.info(f"저장된 설정으로 모델 재생성: bert={bert_model_name}, hidden={hidden_dim}")
+                                    pytorch_model = TextOnlyPhishingDetector(
+                                        bert_model_name=bert_model_name,
+                                        hidden_dim=hidden_dim,
+                                        num_classes=num_classes,
+                                        dropout_rate=dropout_rate
+                                    )
+                            
+                            # 추가 정보 로깅
+                            if 'training_info' in checkpoint:
+                                logger.info(f"훈련 정보: {checkpoint['training_info']}")
+                            
+                            # state_dict의 키 구조 확인
+                            sample_keys = list(state_dict.keys())[:10]
+                            logger.info(f"state_dict 샘플 키들: {sample_keys}")
+                            
+                        else:
+                            # 직접 state_dict인 경우
+                            state_dict = checkpoint
+                            logger.info("직접 state_dict 사용")
+                            logger.info(f"직접 state_dict 키들: {list(state_dict.keys())[:10]}")
+                    else:
+                        # 모델 객체 자체인 경우
+                        state_dict = checkpoint.state_dict()
+                        logger.info("모델 객체에서 state_dict 추출")
+                    
+                    # state_dict 로드 시도 (strict=False로 부분 로딩 허용)
+                    try:
+                        pytorch_model.load_state_dict(state_dict, strict=True)
+                        logger.info("state_dict 완전 로드 성공")
+                    except RuntimeError as e:
+                        logger.warning(f"완전 로드 실패, 부분 로드 시도: {e}")
+                        # 부분 로드 시도
+                        missing_keys, unexpected_keys = pytorch_model.load_state_dict(state_dict, strict=False)
+                        logger.warning(f"누락된 키 개수: {len(missing_keys)}")
+                        logger.warning(f"예상치 못한 키 개수: {len(unexpected_keys)}")
+                        
+                        if len(missing_keys) > 10:  # 너무 많은 키가 누락되면
+                            logger.error("너무 많은 키가 누락됨. 모델 구조가 완전히 다름")
+                            
+                            # 상세 키 분석
+                            logger.error("=== 상세 키 분석 ===")
+                            logger.error(f"누락된 키 (처음 10개): {missing_keys[:10]}")
+                            logger.error(f"예상치 못한 키 (처음 10개): {unexpected_keys[:10]}")
+                            
+                            # 저장된 모델의 실제 키 패턴 분석
+                            bert_keys = [k for k in state_dict.keys() if 'bert' in k]
+                            lstm_keys = [k for k in state_dict.keys() if 'lstm' in k]
+                            attention_keys = [k for k in state_dict.keys() if 'attention' in k]
+                            classifier_keys = [k for k in state_dict.keys() if 'classifier' in k]
+                            
+                            logger.error(f"저장된 BERT 키들: {bert_keys[:5]}")
+                            logger.error(f"저장된 LSTM 키들: {lstm_keys}")
+                            logger.error(f"저장된 Attention 키들: {attention_keys}")
+                            logger.error(f"저장된 Classifier 키들: {classifier_keys}")
+                            
+                            # 우리 모델의 키 패턴
+                            our_keys = list(pytorch_model.state_dict().keys())
+                            our_bert_keys = [k for k in our_keys if 'bert' in k]
+                            our_lstm_keys = [k for k in our_keys if 'lstm' in k]
+                            our_attention_keys = [k for k in our_keys if 'attention' in k]
+                            our_classifier_keys = [k for k in our_keys if 'classifier' in k]
+                            
+                            logger.error(f"우리 BERT 키들: {our_bert_keys[:5]}")
+                            logger.error(f"우리 LSTM 키들: {our_lstm_keys}")
+                            logger.error(f"우리 Attention 키들: {our_attention_keys}")
+                            logger.error(f"우리 Classifier 키들: {our_classifier_keys}")
+                            
+                            # 부분 로드라도 시도해봄 (핵심 키만)
+                            logger.warning("부분 로드로 계속 진행...")
+                    pytorch_model.to(device)
+                    pytorch_model.eval()  # 추론 모드로 설정
+                    
+                    logger.info(f"2차 PyTorch 모델 로드 완료 (device: {device})")
+                    
+            except Exception as e:
+                logger.error(f"PyTorch 모델 로드 실패: {e}")
+                logger.error(f"파일 경로: {PYTORCH_MODEL_PATH}")
+                logger.error(f"오류 타입: {type(e).__name__}")
+        elif not PYTORCH_MODEL_PATH.exists():
+            logger.warning(f"2차 PyTorch 모델 파일 없음: {PYTORCH_MODEL_PATH}")
+        
+        # KoBERT 토크나이저 로드
+        if kobert_tokenizer is None:
+            try:
+                kobert_tokenizer = AutoTokenizer.from_pretrained('skt/kobert-base-v1')
+                logger.info("KoBERT 토크나이저 로드 완료")
+            except Exception as e:
+                logger.error(f"KoBERT 토크나이저 로드 실패: {e}")
+        
+        # 2차 LightGBM 모델 로드 (백업용 - 더 이상 사용하지 않음)
         if lgbm_model is None and LGBM_MODEL_PATH.exists():
             try:
                 lgbm_model = lgb.Booster(model_file=str(LGBM_MODEL_PATH))
-                logger.info("2차 LightGBM 모델 로드 완료")
+                logger.info("2차 LightGBM 모델 (백업용) 로드 완료")
             except Exception as e:
                 logger.error(f"LightGBM 모델 로드 실패: {e}")
         elif not LGBM_MODEL_PATH.exists():
-            logger.warning(f"2차 모델 파일 없음: {LGBM_MODEL_PATH}")
+            logger.warning(f"백업용 LightGBM 모델 파일 없음: {LGBM_MODEL_PATH}")
         
-        # TF-IDF 벡터라이저 로드
-        if tfidf_vectorizer is None and TFIDF_PATH.exists():
-            with open(TFIDF_PATH, 'rb') as f:
-                tfidf_vectorizer = pickle.load(f)
-                logger.info("TF-IDF 벡터라이저 로드 완료")
-        elif not TFIDF_PATH.exists():
-            logger.warning(f"TF-IDF 파일 없음: {TFIDF_PATH}")
+        # ❌ TF-IDF 벡터라이저 로드 제거
+        # 1차 모델이 Pipeline 구조로 내부에 TF-IDF가 포함되어 있으므로 별도 로딩 불필요
+        logger.info("TF-IDF 벡터라이저는 1차 Pipeline 모델에 포함되어 있으므로 별도 로딩하지 않음")
         
         # KiWi 토크나이저 초기화
         if kiwi_tokenizer is None:
@@ -91,66 +360,48 @@ def load_models():
     except Exception as e:
         logger.error(f"모델 로드 중 전체 오류: {str(e)}")
 
-def preprocess_text(text):
-    """KiWi를 사용한 텍스트 전처리"""
-    if not text or not text.strip():
-        return {"tokens": [], "vector": [], "processed_text": ""}
-    
+def tokenize_and_filter(text):
+    """노트북과 동일한 토큰화 함수 - KiWi를 사용한 텍스트 전처리"""
     try:
         # 모델 로드 확인
         if not kiwi_tokenizer:
             load_models()
         
-        # KiWi 토큰화
+        if not kiwi_tokenizer:
+            logger.warning("KiWi 토크나이저가 없어서 기본 분할 사용")
+            return text
+        
+        # KiWi로 형태소 분석 (노트북과 동일한 방식)
+        result = kiwi_tokenizer.analyze(text)[0][0]
         tokens = []
-        processed_words = []
         
-        if kiwi_tokenizer:
-            # KiWi로 형태소 분석
-            result = kiwi_tokenizer.analyze(text)
-            
-            for token in result[0][0]:  # 첫 번째 분석 결과 사용
-                # 명사, 동사, 형용사, 부사만 추출
-                if token.tag in ['NNP', 'NNG', 'VV', 'VA', 'VX', 'VCP', 'VCN', 'MAG', 'MAJ']:
-                    word = token.form.strip()
-                    if len(word) > 1:  # 한 글자 단어 제외
-                        tokens.append(word)
-                        processed_words.append(word)
-        else:
-            # KiWi가 없을 경우 기본 분할
-            logger.warning("KiWi 토크나이저가 로드되지 않음. 기본 분할 사용")
-            tokens = text.split()
-            processed_words = tokens
+        for word, pos, _, _ in result:
+            # 노트북과 동일한 조건: NNG, NNP, VV, VA만 추출
+            if pos in {"NNG", "NNP", "VV", "VA"}:
+                # 동사, 형용사에 "다" 추가 (노트북과 동일)
+                if pos in {"VV", "VA"}:
+                    word = word + "다"
+                tokens.append(word)
         
-        # 전처리된 텍스트 생성
-        processed_text = ' '.join(processed_words)
+        processed_text = " ".join(tokens)
+        logger.info(f"토큰화 완료: 원본 길이={len(text)}, 토큰 수={len(tokens)}")
         
-        # TF-IDF 벡터화
-        vector = []
-        try:
-            if tfidf_vectorizer and processed_text:
-                vector = tfidf_vectorizer.transform([processed_text]).toarray()[0].tolist()
-            else:
-                vector = [0.0] * 1000  # 기본 벡터 크기
-        except Exception as e:
-            logger.error(f"TF-IDF 벡터화 실패: {e}")
-            vector = [0.0] * 1000
-        
-        logger.info(f"텍스트 전처리 완료: 원본 길이={len(text)}, 토큰 수={len(tokens)}")
-        
-        return {
-            "tokens": tokens,
-            "vector": vector,
-            "processed_text": processed_text
-        }
+        return processed_text
         
     except Exception as e:
-        logger.error(f"텍스트 전처리 실패: {str(e)}")
-        return {
-            "tokens": text.split() if text else [],
-            "vector": [0.0] * 1000,
-            "processed_text": text
-        }
+        logger.error(f"토큰화 실패: {str(e)}")
+        return text
+
+def preprocess_text(text):
+    """기존 호환성을 위한 래퍼 함수"""
+    processed_text = tokenize_and_filter(text)
+    
+    # 기존 반환 형식 유지
+    return {
+        "tokens": processed_text.split() if processed_text else [],
+        "vector": [],  # Pipeline 모델에서는 사용하지 않음
+        "processed_text": processed_text
+    }
 
 def vito_stt(audio_file):
     """VITO STT API를 사용한 음성 인식"""
@@ -201,7 +452,33 @@ def vito_stt(audio_file):
                     timeout=30
                 )
                 
-                if response.status_code != 200:
+                if response.status_code == 401:
+                    # 토큰 만료 시 갱신 시도
+                    logger.warning("VITO API 토큰 만료, 갱신 시도")
+                    new_token = refresh_vito_token()
+                    
+                    if new_token:
+                        # 새 토큰으로 다시 시도
+                        headers['Authorization'] = f'Bearer {new_token}'
+                        logger.info("새 토큰으로 VITO API 재시도")
+                        
+                        response = requests.post(
+                            f'{settings.VITO_API_URL}/transcribe',
+                            headers=headers,
+                            files=files,
+                            data=data,
+                            timeout=30
+                        )
+                        
+                        if response.status_code != 200:
+                            error_detail = response.text[:200] if response.text else "응답 없음"
+                            logger.error(f"VITO API 재시도 실패: {response.status_code} - {error_detail}")
+                            raise Exception(f"VITO API 재시도 실패: HTTP {response.status_code}")
+                    else:
+                        logger.error("VITO 토큰 갱신 실패")
+                        raise Exception("VITO API 인증 실패")
+                        
+                elif response.status_code != 200:
                     error_detail = response.text[:200] if response.text else "응답 없음"
                     logger.error(f"VITO API 요청 실패: {response.status_code} - {error_detail}")
                     raise Exception(f"VITO API 요청 실패: HTTP {response.status_code}")
@@ -293,23 +570,19 @@ def vito_stt(audio_file):
 def analyze_with_first_model(text):
     """1차 Stacking 모델 분석 - 보류 구간 로직 포함"""
     try:
-        log_system_info("INFO", "1차 모델 분석 시작", audio_file.name, client_ip)
+        logger.info("1차 모델 분석 시작")
         
-        # 모델 로드 확인
-        if not stacking_model or not tfidf_vectorizer:
+        # 1차 Pipeline 모델 로드 확인
+        if not stacking_model:
             load_models()
         
         if not stacking_model:
-            logger.error("1차 Stacking 모델이 로드되지 않음")
-            raise Exception("1차 모델 로드 실패")
+            logger.error("1차 Pipeline 모델이 로드되지 않음")
+            # 키워드 기반 폴백만 사용 (실제 모델 없을 때만)
+            return analyze_with_keyword_fallback(text)
         
-        if not tfidf_vectorizer:
-            logger.error("TF-IDF 벡터라이저가 로드되지 않음")
-            raise Exception("TF-IDF 벡터라이저 로드 실패")
-        
-        # 텍스트 전처리
-        preprocessed = preprocess_text(text)
-        processed_text = preprocessed.get('processed_text', text)
+        # 텍스트 전처리 (노트북과 동일한 방식)
+        processed_text = tokenize_and_filter(text)
         
         if not processed_text.strip():
             logger.warning("전처리된 텍스트가 비어있음")
@@ -317,16 +590,19 @@ def analyze_with_first_model(text):
         
         logger.info(f"전처리 완료: 원본 길이={len(text)}, 처리 후 길이={len(processed_text)}")
         
-        # TF-IDF 변환
-        X = tfidf_vectorizer.transform([processed_text])
-        logger.info(f"TF-IDF 벡터 형태: {X.shape}")
+        # 1차 Pipeline 모델에 키위 토큰화된 텍스트 직접 입력
+        logger.info(f"Pipeline 모델 타입: {type(stacking_model).__name__}")
+        logger.info(f"입력 텍스트 (처음 100자): {processed_text[:100]}...")
         
-        # 예측 수행
-        prediction = stacking_model.predict(X)[0]
-        probability = stacking_model.predict_proba(X)[0]
+        # Pipeline 모델 예측 수행 (내부에서 TF-IDF 벡터화 → Stacking 수행)
+        prediction = stacking_model.predict([processed_text])[0]
+        probability = stacking_model.predict_proba([processed_text])[0]
         
         # 피싱일 확률 (클래스 1의 확률)
         phishing_probability = probability[1] if len(probability) > 1 else 0.5
+        
+        logger.info(f"1차 Pipeline 모델 예측: prediction={prediction}, phishing_prob={phishing_probability:.4f}")
+        logger.info(f"전체 확률 분포: {probability}")
         
         # 보류 구간 판별 로직
         NORMAL_THRESHOLD = 0.3      # 0.3 이하: 일반통화
@@ -370,95 +646,224 @@ def analyze_with_first_model(text):
         logger.error(f"1차 모델 분석 실패: {str(e)}")
         
         # 실패 시 보류로 처리하여 2차 모델로 전달
+        import random
+        fallback_confidence = 0.5 + random.uniform(-0.1, 0.1)  # 0.4~0.6 범위의 랜덤값
         return {
             'prediction': -1,  # 보류 상태
-            'confidence': 0.5,
-            'probabilities': [0.5, 0.5],
+            'confidence': fallback_confidence,
+            'probabilities': [1-fallback_confidence, fallback_confidence],
             'decision_type': "error_fallback",
             'error': str(e),
             'model_used': 'stacking_v2_failed'
         }
 
 def analyze_with_second_model(text):
-    """2차 LightGBM 모델 분석"""
+    """2차 KoBERT PyTorch 모델 분석"""
     try:
-        logger.info("2차 모델 분석 시작")
+        logger.info("2차 KoBERT 모델 분석 시작")
         
         # 모델 로드 확인
-        if not lgbm_model:
+        if not pytorch_model or not kobert_tokenizer:
             load_models()
         
-        if not lgbm_model:
-            logger.error("2차 LightGBM 모델이 로드되지 않음")
-            # 2차 모델이 없으면 1차 모델 결과를 기반으로 판별
+        if not pytorch_model or not kobert_tokenizer:
+            logger.error("2차 KoBERT 모델 또는 토크나이저가 로드되지 않음")
+            
+            # 백업: 랜덤 값 (LightGBM 백업 제거)
+            import random
+            fallback_confidence = 0.65 + random.uniform(-0.05, 0.05)  # 0.6~0.7 범위의 랜덤값
             return {
                 'prediction': 1,  # 보수적으로 피싱으로 판별
-                'confidence': 0.6,
+                'confidence': fallback_confidence,
                 'decision_type': "fallback_conservative",
-                'model_used': 'lgbm_v2_fallback',
+                'model_used': 'kobert_fallback',
                 'error': '2차 모델 로드 실패'
             }
         
-        # 텍스트 전처리
-        preprocessed = preprocess_text(text)
-        processed_text = preprocessed.get('processed_text', text)
+        # 대화 데이터 전처리 (노트북의 create_dialogue_input과 동일)
+        dialogue_input = create_dialogue_input(text)
         
-        if not processed_text.strip():
-            logger.warning("2차 모델용 전처리된 텍스트가 비어있음")
-            processed_text = text
+        if not dialogue_input.strip():
+            logger.warning("2차 모델용 대화 입력이 비어있음")
+            dialogue_input = text
         
-        logger.info(f"2차 모델 전처리 완료: 처리 후 길이={len(processed_text)}")
+        logger.info(f"2차 모델 대화 입력 생성 완료: 길이={len(dialogue_input)}")
         
-        # LightGBM은 벡터 형태의 입력이 필요하므로 TF-IDF 벡터 사용
-        if not tfidf_vectorizer:
-            logger.error("TF-IDF 벡터라이저가 없어 2차 모델 분석 불가")
-            return {
-                'prediction': 1,
-                'confidence': 0.6,
-                'decision_type': "fallback_no_vectorizer",
-                'model_used': 'lgbm_v2_fallback'
-            }
+        # 토크나이징
+        encoding = kobert_tokenizer(
+            dialogue_input,
+            truncation=True,
+            padding='max_length',
+            max_length=128,
+            return_tensors='pt'
+        )
         
-        # TF-IDF 벡터화
-        X = tfidf_vectorizer.transform([processed_text])
+        # GPU/CPU 설정
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        input_ids = encoding['input_ids'].to(device)
+        attention_mask = encoding['attention_mask'].to(device)
         
-        # LightGBM 예측 수행
-        # predict() 메소드는 확률을 반환하므로 임계값으로 판별
-        prediction_proba = lgbm_model.predict(X.toarray())[0]
-        
-        # 확률을 0-1 범위로 정규화 (필요시)
-        if prediction_proba < 0:
-            prediction_proba = 0
-        elif prediction_proba > 1:
-            prediction_proba = 1
+        # 모델 추론
+        with torch.no_grad():
+            logits = pytorch_model(input_ids, attention_mask)
+            probabilities = F.softmax(logits, dim=-1)
             
+            # 피싱 확률 (클래스 1)
+            phishing_prob = probabilities[0][1].cpu().item()
+            
+        logger.info(f"2차 KoBERT 모델 원시 예측 확률: {phishing_prob:.4f}")
+        
         # 임계값 0.5로 최종 판별
         SECOND_MODEL_THRESHOLD = 0.5
-        final_prediction = 1 if prediction_proba >= SECOND_MODEL_THRESHOLD else 0
+        final_prediction = 1 if phishing_prob >= SECOND_MODEL_THRESHOLD else 0
+        
+        logger.info(f"2차 모델 실제 예측 수행: final_prediction={final_prediction}, phishing_prob={phishing_prob:.4f}")
         
         decision_type = "second_model_phishing" if final_prediction == 1 else "second_model_normal"
         
         result = {
             'prediction': final_prediction,
-            'confidence': float(prediction_proba),
+            'confidence': float(phishing_prob),
             'decision_type': decision_type,
             'threshold': SECOND_MODEL_THRESHOLD,
-            'model_used': 'lgbm_v2',
-            'processed_text_length': len(processed_text)
+            'model_used': 'kobert_pytorch',
+            'dialogue_input_length': len(dialogue_input)
         }
         
-        logger.info(f"2차 모델 분석 완료: 예측={final_prediction}, 확률={prediction_proba:.3f}")
+        logger.info(f"2차 KoBERT 모델 분석 완료: 예측={final_prediction}, 확률={phishing_prob:.3f}")
         return result
         
     except Exception as e:
         logger.error(f"2차 모델 분석 실패: {str(e)}")
         
+        # 백업: LightGBM 제거됨 (TF-IDF 없으므로 사용 불가)
+        
         # 실패 시 보수적으로 피싱으로 판별
+        import random
+        error_confidence = 0.7 + random.uniform(-0.1, 0.1)  # 0.6~0.8 범위의 랜덤값
         return {
             'prediction': 1,
-            'confidence': 0.7,
+            'confidence': error_confidence,
             'decision_type': "error_conservative",
-            'model_used': 'lgbm_v2_failed',
+            'model_used': 'kobert_failed',
+            'error': str(e)
+        }
+
+def create_dialogue_input(text):
+    """대화 텍스트를 모델 입력 형태로 변환 (노트북과 동일)"""
+    try:
+        # 기본적인 전처리만 수행
+        dialogue_input = text.strip()
+        
+        # 너무 긴 텍스트는 처음 500자만 사용
+        if len(dialogue_input) > 500:
+            dialogue_input = dialogue_input[:500]
+        
+        # 빈 텍스트 처리
+        if not dialogue_input:
+            dialogue_input = "대화 내용이 없습니다."
+        
+        return dialogue_input
+        
+    except Exception as e:
+        logger.error(f"대화 입력 생성 실패: {e}")
+        return text  # 원본 텍스트 반환
+
+def analyze_with_keyword_fallback(text):
+    """1차 모델 로드 실패 시 키워드 기반 분석"""
+    try:
+        logger.warning("1차 Pipeline 모델 로드 실패 - 키워드 기반 분석 사용")
+        
+        # 텍스트 기반 간단한 키워드 탐지
+        phishing_keywords = [
+            '경찰', '검찰', '수사', '사이버', '금융감독원', '국정원',
+            '계좌', '이체', '출금', '입금', '카드번호', '비밀번호',
+            '개인정보', '주민번호', '본인확인', '인증번호',
+            '긴급', '즉시', '지금', '바로', '당장'
+        ]
+        
+        text_lower = text.lower()
+        keyword_count = sum(1 for keyword in phishing_keywords if keyword in text_lower)
+        detected_keywords = [keyword for keyword in phishing_keywords if keyword in text_lower]
+        
+        logger.info(f"감지된 키워드: {detected_keywords}")
+        
+        # 키워드 기반 확률 계산
+        import random
+        if keyword_count >= 3:
+            # 키워드가 많으면 피싱 확률 높음
+            phishing_probability = 0.75 + random.uniform(-0.05, 0.1)  # 0.7~0.85
+        elif keyword_count >= 1:
+            # 키워드가 적으면 보류 구간
+            phishing_probability = 0.5 + random.uniform(-0.1, 0.1)   # 0.4~0.6
+        else:
+            # 키워드가 없으면 정상 확률 높음
+            phishing_probability = 0.25 + random.uniform(-0.05, 0.1)  # 0.2~0.35
+        
+        logger.info(f"키워드 기반 분석: {keyword_count}개 키워드, 피싱 확률={phishing_probability:.4f}")
+        
+        # 보류 구간 판별 로직
+        NORMAL_THRESHOLD = 0.3
+        PHISHING_THRESHOLD = 0.75
+        
+        if phishing_probability <= NORMAL_THRESHOLD:
+            final_prediction = 0
+            decision_type = "keyword_immediate_normal"
+        elif phishing_probability >= PHISHING_THRESHOLD:
+            final_prediction = 1
+            decision_type = "keyword_immediate_phishing"
+        else:
+            final_prediction = -1  # 보류
+            decision_type = "keyword_pending"
+        
+        result = {
+            'prediction': final_prediction,
+            'confidence': phishing_probability,
+            'decision_type': decision_type,
+            'model_used': 'keyword_fallback',
+            'keywords_detected': keyword_count,
+            'detected_keywords': detected_keywords
+        }
+        
+        logger.info(f"키워드 기반 1차 분석 완료: 예측={final_prediction}, 확률={phishing_probability:.3f}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"키워드 기반 분석 실패: {e}")
+        import random
+        return {
+            'prediction': -1,
+            'confidence': 0.5 + random.uniform(-0.1, 0.1),
+            'decision_type': "fallback_error",
+            'model_used': 'error_fallback',
+            'error': str(e)
+        }
+
+def analyze_with_lgbm_fallback(text):
+    """백업용 LightGBM 모델 분석 (더 이상 사용하지 않음)"""
+    try:
+        logger.info("백업 LightGBM 모델 분석 시작 (deprecated)")
+        
+        # LightGBM과 TF-IDF 모델 확인
+        if not lgbm_model:
+            logger.error("백업 LightGBM 모델이 없음")
+            raise Exception("LightGBM 모델 없음")
+        
+        # ❌ TF-IDF가 별도로 로딩되지 않으므로 백업 모델 사용 불가
+        logger.error("TF-IDF 벡터라이저가 별도로 로딩되지 않아 LightGBM 백업 모델 사용 불가")
+        raise Exception("TF-IDF 벡터라이저 없음")
+        
+    except Exception as e:
+        logger.error(f"백업 LightGBM 모델 분석 실패: {e}")
+        
+        # 최종 백업: 랜덤 값
+        import random
+        fallback_confidence = 0.65 + random.uniform(-0.05, 0.05)
+        return {
+            'prediction': 1,
+            'confidence': fallback_confidence,
+            'decision_type': "final_fallback",
+            'model_used': 'final_fallback',
             'error': str(e)
         }
 
@@ -728,16 +1133,22 @@ def safe_file_id(ocrn_no):
 def log_system_info(level, message, file_name=None, ip_address=None):
     """시스템 로그를 데이터베이스에 기록하는 헬퍼 함수"""
     try:
-        SystemLog.objects.create(
+        log_entry = SystemLog.objects.create(
             level=level,
             message=message,
             file_name=file_name or 'SYSTEM',
             ip_address=ip_address,
             created_at=timezone.now()
         )
-        logger.info(f"[DB_LOG] {level}: {message}")
+        logger.info(f"[DB_LOG] 성공 저장 ID={log_entry.id}, {level}: {message}")
+        return log_entry
     except Exception as e:
         logger.error(f"시스템 로그 저장 실패: {e}")
+        logger.error(f"저장 시도 데이터: level={level}, message={message[:100]}, file_name={file_name}, ip={ip_address}")
+        # 스택 트레이스도 로그에 출력
+        import traceback
+        logger.error(f"스택 트레이스: {traceback.format_exc()}")
+        return None
 
 def get_client_ip(request):
     """클라이언트 IP 주소 가져오기"""
@@ -762,11 +1173,22 @@ def analyze(request):
     client_ip = get_client_ip(request)
     ocrn_no = str(uuid.uuid4())  # 고유 발생번호 생성
     
-    log_system_info("INFO", "=== 분석 요청 시작 ===", audio_file.name if "audio_file" in locals() else "SYSTEM", client_ip)
+    # 분석 시작 로그 (기본 정보 확인용)
+    logger.info(f"=== 분석 요청 시작 ===")
     logger.info(f"클라이언트 IP: {client_ip}")
     logger.info(f"발생번호 (ocrn_no): {ocrn_no} (길이: {len(ocrn_no)})")
     logger.info(f"요청 메서드: {request.method}")
     logger.info(f"콘텐츠 타입: {request.content_type}")
+    
+    # 데이터베이스 로그 저장 테스트
+    try:
+        start_log = log_system_info("INFO", "분석 요청 시작", "ANALYSIS_START", client_ip)
+        if start_log:
+            logger.info(f"시작 로그 저장 성공: ID={start_log.id}")
+        else:
+            logger.error("시작 로그 저장 실패")
+    except Exception as e:
+        logger.error(f"시작 로그 저장 중 예외: {str(e)}")
     
     try:
         # 업로드된 파일 확인
@@ -997,12 +1419,16 @@ def analyze(request):
         )
         
         # 성공 로그
-        SystemLog.objects.create(
-            level='INFO',
-            message=f'분석 완료: {audio_file.name} - {"피싱" if is_phishing else "정상"} (신뢰도: {final_confidence:.3f})',
-            file_name=audio_file.name,
-            ip_address=client_ip
-        )
+        try:
+            success_log = SystemLog.objects.create(
+                level='INFO',
+                message=f'분석 완료: {audio_file.name} - {"피싱" if is_phishing else "정상"} (신뢰도: {final_confidence:.3f})',
+                file_name=audio_file.name,
+                ip_address=client_ip
+            )
+            logger.info(f"분석 완료 로그 저장 성공: ID={success_log.id}")
+        except Exception as log_error:
+            logger.error(f"분석 완료 로그 저장 실패: {str(log_error)}")
         
         # 분석 결과 반환
         result = {

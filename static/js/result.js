@@ -242,21 +242,32 @@ function hideFeedback() {
 function resetFeedbackForm() {
   console.log('피드백 폼 완전 초기화 시작')
   
-  // 라디오 버튼 초기화 (모든 가능한 name 속성 대상)
-  const radioButtons = document.querySelectorAll('input[name="feedback"], input[name="feedback-accuracy"]')
+  // 모든 라디오 버튼 초기화 (더 광범위하게)
+  const radioButtons = document.querySelectorAll('input[type="radio"]')
   radioButtons.forEach(radio => {
     radio.checked = false
     radio.disabled = false
   })
   
-  // 텍스트 영역 초기화 (모든 가능한 ID 대상)
-  const textareas = ['feedbackComment', 'feedback-comment']
-  textareas.forEach(id => {
-    const textarea = document.getElementById(id)
-    if (textarea) {
-      textarea.value = ''
-      textarea.disabled = false
-    }
+  // 모든 체크박스 초기화
+  const checkBoxes = document.querySelectorAll('input[type="checkbox"]')
+  checkBoxes.forEach(checkbox => {
+    checkbox.checked = false
+    checkbox.disabled = false
+  })
+  
+  // 모든 텍스트 영역 초기화
+  const textareas = document.querySelectorAll('textarea')
+  textareas.forEach(textarea => {
+    textarea.value = ''
+    textarea.disabled = false
+  })
+  
+  // 모든 텍스트 입력 필드 초기화
+  const textInputs = document.querySelectorAll('input[type="text"]')
+  textInputs.forEach(input => {
+    input.value = ''
+    input.disabled = false
   })
   
   // 문자 카운터 초기화
@@ -265,6 +276,38 @@ function resetFeedbackForm() {
     charCount.textContent = '0'
     charCount.style.color = '#6b7280' // 기본 회색으로 초기화
   }
+  
+  // 피드백 섹션 숨기기
+  const feedbackSection = document.querySelector('.feedback-section')
+  if (feedbackSection) {
+    feedbackSection.style.display = 'none'
+  }
+  
+  // 피드백 성공 메시지 숨기기
+  const successMessage = document.querySelector('.feedback-success')
+  if (successMessage) {
+    successMessage.style.display = 'none'
+  }
+  
+  // 피드백 버튼 다시 보이기
+  const feedbackBtn = document.getElementById('feedbackBtn')
+  if (feedbackBtn) {
+    feedbackBtn.style.display = 'inline-block'
+  }
+  
+  // 로컬스토리지에서 피드백 관련 데이터 제거 (더 광범위하게)
+  const feedbackKeys = [
+    'feedbackData', 'feedbackSubmitted', 'userFeedback', 
+    'feedback_data', 'feedback_submitted', 'user_feedback',
+    'currentFeedback', 'lastFeedback', 'feedbackState'
+  ]
+  
+  feedbackKeys.forEach(key => {
+    localStorage.removeItem(key)
+    sessionStorage.removeItem(key)
+  })
+  
+  console.log('피드백 폼 완전 초기화 완료')
   
   // 제출 버튼 초기화 (모든 가능한 ID 대상)
   const submitBtns = ['submitFeedbackBtn', 'submit-feedback-btn']
@@ -551,16 +594,175 @@ function getCsrfToken() {
   return ''
 }
 
-// 다시 분석 버튼 클릭 시 피드백 폼 초기화
+// 다시 분석 버튼 클릭 시 완전 새로고침
 function retryAnalysis() {
-  console.log('다시 분석 버튼 클릭 - 피드백 폼 초기화')
+  console.log('다시 분석 버튼 클릭 - 완전 새로고침 시작')
+  
+  // 1. 모든 분석 관련 데이터 즉시 제거
+  clearAllAnalysisData()
+  
+  // 2. 피드백 폼 완전 초기화
   resetFeedbackForm()
-  window.location.href = '/'
+  
+  // 3. DOM 요소 완전 초기화
+  clearAllDOMElements()
+  
+  // 4. 강제 새로고침으로 홈페이지 이동 (캐시 무시)
+  window.location.replace('/')
+  
+  // 5. 추가 보장: 페이지 새로고침
+  setTimeout(() => {
+    window.location.reload(true)  // 강제 새로고침 (캐시 무시)
+  }, 100)
 }
 
-// 홈으로 이동 시 피드백 폼 초기화
+// 홈으로 이동 시 완전 새로고침
 function goHome() {
-  console.log('홈으로 버튼 클릭 - 피드백 폼 초기화')
+  console.log('홈으로 버튼 클릭 - 완전 새로고침 시작')
+  
+  // 1. 모든 분석 관련 데이터 즉시 제거
+  clearAllAnalysisData()
+  
+  // 2. 피드백 폼 완전 초기화
   resetFeedbackForm()
-  window.location.href = '/'
+  
+  // 3. DOM 요소 완전 초기화
+  clearAllDOMElements()
+  
+  // 4. 강제 새로고침으로 홈페이지 이동 (캐시 무시)
+  window.location.replace('/')
+  
+  // 5. 추가 보장: 페이지 새로고침
+  setTimeout(() => {
+    window.location.reload(true)  // 강제 새로고침 (캐시 무시)
+  }, 100)
+}
+
+// 모든 분석 관련 데이터 완전 제거
+function clearAllAnalysisData() {
+  console.log('모든 분석 관련 데이터 완전 제거 시작')
+  
+  // 1. 로컬스토리지 완전 초기화 (더 광범위하게)
+  const keysToRemove = [
+    'analysisResult', 'currentTaskId', 'feedbackData', 'feedbackSubmitted', 
+    'userFeedback', 'analysisData', 'uploadedFile', 'taskResult',
+    'lastAnalysis', 'currentAnalysis', 'feedbackState', 'currentFeedback',
+    'lastFeedback', 'user_feedback', 'feedback_data', 'feedback_submitted',
+    'analysis_result', 'task_id', 'result_data', 'upload_data'
+  ]
+  
+  keysToRemove.forEach(key => {
+    localStorage.removeItem(key)
+    sessionStorage.removeItem(key)
+  })
+  
+  // 2. 전체 localStorage와 sessionStorage 완전 초기화 (극단적 방법)
+  try {
+    localStorage.clear()
+    sessionStorage.clear()
+    console.log('localStorage와 sessionStorage 완전 초기화')
+  } catch (e) {
+    console.error('스토리지 초기화 오류:', e)
+  }
+  
+  // 3. 모든 쿠키 제거
+  document.cookie.split(";").forEach(function(c) { 
+    const eqPos = c.indexOf("=")
+    const name = eqPos > -1 ? c.substr(0, eqPos).trim() : c.trim()
+    document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + window.location.hostname
+    document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/"
+  })
+  
+  // 4. 전역 변수 초기화
+  if (typeof analysisResult !== 'undefined') {
+    analysisResult = null
+  }
+  if (typeof currentTaskId !== 'undefined') {
+    currentTaskId = null
+  }
+  if (typeof currentAnalysisData !== 'undefined') {
+    currentAnalysisData = null
+  }
+  
+  // 5. 메모리 강제 정리
+  if (window.gc) {
+    window.gc()
+  }
+  
+  console.log('모든 분석 관련 데이터 제거 완료')
+}
+
+// DOM 요소들 완전 초기화
+function clearAllDOMElements() {
+  console.log('DOM 요소 완전 초기화 시작')
+  
+  try {
+    // 1. 모든 폼 요소 초기화
+    const forms = document.querySelectorAll('form')
+    forms.forEach(form => {
+      form.reset()
+    })
+    
+    // 2. 모든 입력 필드 초기화
+    const inputs = document.querySelectorAll('input, textarea, select')
+    inputs.forEach(input => {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        input.checked = false
+      } else {
+        input.value = ''
+      }
+      input.disabled = false
+    })
+    
+    // 3. 피드백 관련 UI 요소 숨기기/초기화
+    const feedbackElements = [
+      '.feedback-section', '.feedback-success', '.feedback-error',
+      '#feedbackSection', '#feedbackSuccess', '#feedbackError'
+    ]
+    
+    feedbackElements.forEach(selector => {
+      const elements = document.querySelectorAll(selector)
+      elements.forEach(element => {
+        element.style.display = 'none'
+        if (element.classList) {
+          element.classList.remove('show', 'active', 'visible')
+        }
+      })
+    })
+    
+    // 4. 결과 관련 텍스트 초기화
+    const textElements = [
+      '#resultText', '#finalResult', '#phishingType', 
+      '#confidence', '#warningText', '#feedbackComment'
+    ]
+    
+    textElements.forEach(selector => {
+      const element = document.querySelector(selector)
+      if (element) {
+        element.textContent = ''
+        element.innerHTML = ''
+      }
+    })
+    
+    // 5. 모든 동적 메시지 제거
+    const dynamicMessages = document.querySelectorAll(
+      '.alert, .notification, .message, .toast, .popup'
+    )
+    dynamicMessages.forEach(msg => {
+      msg.remove()
+    })
+    
+    // 6. 이벤트 리스너 제거 (메모리 누수 방지)
+    const elementsWithEvents = document.querySelectorAll('[onclick], [onchange], [oninput]')
+    elementsWithEvents.forEach(element => {
+      element.onclick = null
+      element.onchange = null
+      element.oninput = null
+    })
+    
+    console.log('DOM 요소 완전 초기화 완료')
+    
+  } catch (error) {
+    console.error('DOM 초기화 중 오류:', error)
+  }
 }
