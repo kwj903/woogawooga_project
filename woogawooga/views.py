@@ -1735,11 +1735,3 @@ def statistics(request):
     return render(request, 'voice_phishing/statistics.html', context)
 
 
-def upload(request):
-    """업로드 페이지 렌더링"""
-    return render(request, 'upload.html')
-
-
-def result(request):
-    """결과 페이지 렌더링"""
-    return render(request, 'result.html')
