@@ -523,7 +523,49 @@ class VoicePhishingDetector {
     analyzeBtn.classList.remove('processing')
     analyzeBtn.textContent = '분석 시작'
     
+    // 피드백 상태 완전히 초기화
+    this.resetFeedbackState()
+    
     this.showScreen("upload")
+  }
+
+  resetFeedbackState() {
+    // 피드백 라디오 버튼 선택 해제 및 활성화
+    const radioButtons = document.querySelectorAll('input[name="feedback-accuracy"]')
+    radioButtons.forEach(radio => {
+      radio.checked = false
+      radio.disabled = false
+    })
+    
+    // 피드백 코멘트 초기화 및 활성화
+    const commentTextarea = document.getElementById('feedback-comment')
+    if (commentTextarea) {
+      commentTextarea.value = ''
+      commentTextarea.disabled = false
+    }
+    
+    // 피드백 제출 버튼 비활성화 및 원래 상태 복원
+    const submitBtn = document.getElementById('submit-feedback-btn')
+    if (submitBtn) {
+      submitBtn.disabled = true
+      submitBtn.innerHTML = `
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zm0 4.7l-8 5.334L4 8.7V6.297l8 5.333 8-5.333V8.7z"/>
+        </svg>
+        피드백 제출
+      `
+    }
+    
+    // 피드백 상태 메시지 숨김
+    const statusDiv = document.getElementById('feedback-status')
+    if (statusDiv) {
+      statusDiv.classList.add('hidden')
+      statusDiv.textContent = ''
+      statusDiv.className = 'feedback-status hidden'
+    }
+    
+    // 현재 분석 결과 초기화
+    this.currentAnalysisResult = null
   }
 
   showScreen(screenName) {
