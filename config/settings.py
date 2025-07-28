@@ -99,6 +99,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # }
 DATABASES = {
     "default": {
+<<<<<<< HEAD
         "ENGINE": os.getenv("DB_ENGINE"),
         "NAME": os.getenv("DB_NAME"),
         "USER": os.getenv("DB_USER"),
@@ -108,6 +109,15 @@ DATABASES = {
         "OPTIONS": {
             "charset": os.getenv("DB_CHARSET"),
         },
+=======
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": "woogawooga_db",
+        "USER": "woogawooga_JJ",
+        "PASSWORD": "JJ123",
+        "HOST": "192.168.0.13",
+        "PORT": "3306",
+        "CHARSET": "utf8mb4",
+>>>>>>> jj_jakup
     }
 }
 
