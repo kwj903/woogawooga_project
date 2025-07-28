@@ -1,0 +1,155 @@
+# Django 프로젝트 구조 분석 보고서
+
+## 1. 프로젝트 개요
+
+**프로젝트명**: woogawooga_project
+**목적**: AI 기반 보이스피싱 탐지 시스템
+**Django 버전**: 5.2.4
+**분석일**: 2025-07-27
+
+이 프로젝트는 음성 파일을 분석하여 보이스피싱 여부를 판단하는 웹 애플리케이션입니다. 1차 머신러닝 모델과 2차 딥러닝 모델을 연동하여 높은 정확도의 분석 결과를 제공합니다.
+
+## 2. 프로젝트 구조
+
+```
+woogawooga_project/
+├── config/                 # Django 설정 패키지
+│   ├── settings.py         # 메인 설정 파일
+│   ├── urls.py            # 루트 URL 설정  
+│   ├── wsgi.py            # WSGI 설정
+│   └── asgi.py            # ASGI 설정
+├── woogawooga/            # 메인 애플리케이션
+│   ├── models.py          # 데이터베이스 모델
+│   ├── views.py           # 뷰 함수들
+│   ├── urls.py            # 앱 URL 설정
+│   └── migrations/        # 데이터베이스 마이그레이션
+├── templates/             # HTML 템플릿
+├── static/               # 정적 파일 (CSS, JS, 이미지)
+├── media/                # 업로드된 파일
+├── dataset/              # 머신러닝 데이터셋
+├── models/               # 학습된 모델 파일
+└── manage.py             # Django 관리 스크립트
+```
+
+## 3. Django 설정 분석
+
+### 3.1 settings.py
+- **데이터베이스**: MySQL (woogawooga_db)
+- **언어**: 한국어 (ko-kr)
+- **시간대**: Asia/Seoul
+- **API 키**: VITO_API_KEY, OPENAI_API_KEY, GPT_API_KEY
+
+### 3.2 urls.py
+- `/admin/`: Django 관리자
+- `/`: woogawooga 앱 라우팅
+
+## 4. 메인 애플리케이션 (woogawooga)
+
+### 4.1 데이터베이스 모델
+
+#### ProcessdFile (처리된 파일)
+- `ocrn_no`: 발생번호 (기본키)
+- `transcript`: 전사내용
+- `prcs_cont_1`: 1차 전처리내용
+- `file_path`: 파일경로
+
+#### InferenceResult (추론 결과)  
+- `rslt_id`: 결과ID
+- `ml_rslt_cd`: ML결과코드 (0=정상, 1=피싱)
+- `prdt_scr`: 예측점수
+- `phsh_tp_nm`: 피싱유형명
+- `warn_cn`: 경고내용
+
+#### Feedback (피드백)
+- `prp_no`: 제안번호
+- `prdt_rslt_yn`: 예측결과여부
+- `wropn_cn`: 의견내용
+
+### 4.2 주요 뷰 함수
+
+#### analyze 뷰 - 메인 분석 API
+1. 파일 검증 (크기, 형식)
+2. VITO STT 처리
+3. 텍스트 전처리 (KiWi 형태소 분석)
+4. 1차 모델 분석 (Stacking)
+5. 2차 모델 분석 (LightGBM) - 조건부
+6. LLM 설명 생성 (GPT-4o)
+7. 데이터베이스 저장
+
+#### 핵심 분석 로직
+- **보류 구간**: 0.3~0.75 확률에서 2차 모델 실행
+- **즉시 판별**: 0.3 이하(정상), 0.75 이상(피싱)
+
+### 4.3 URL 패턴
+- `/`: 메인 페이지
+- `/upload/`: 업로드 페이지
+- `/analyze/`: 분석 API
+- `/submit_feedback/`: 피드백 API
+- `/statistics/`: 통계 페이지
+
+## 5. 프론트엔드 구조
+
+### 5.1 템플릿
+- `index.html`: 메인 랜딩 페이지
+- `voice_phishing/index.html`: 통합 분석 인터페이스 (메인 UI)
+
+### 5.2 JavaScript
+- `voice_phishing/js/main.js`: 통합 인터페이스 메인 스크립트
+- `js/upload.js`: 파일 업로드 처리
+- `js/analysis.js`: 분석 진행 처리
+
+## 6. 데이터 처리 플로우
+
+```
+파일 업로드 → STT → 전처리 → 1차 ML → [2차 DL] → LLM → DB 저장 → 응답
+```
+
+1. 음성 파일 업로드 및 검증
+2. VITO API로 음성-텍스트 변환
+3. KiWi 형태소 분석 + TF-IDF 벡터화
+4. Stacking 모델로 1차 분석
+5. 보류 구간시 LightGBM으로 2차 분석
+6. GPT-4o로 유형 분류 및 경고 생성
+7. 다중 테이블 저장 및 JSON 응답
+
+## 7. 주요 특징
+
+### 7.1 AI 파이프라인
+- **1차 모델**: Stacking Classifier
+- **2차 모델**: LightGBM  
+- **특징 추출**: TF-IDF + KiWi 형태소 분석
+- **보류 구간**: 정확도 향상을 위한 핵심 로직
+
+### 7.2 사용자 인터페이스
+- 반응형 웹 디자인
+- 실시간 진행률 표시
+- 4단계 화면 (업로드→분석→에러→결과)
+- 사용자 피드백 수집
+
+### 7.3 보안 및 에러 처리
+- 파일 검증 (크기, 형식, 확장자)
+- UTF-8 인코딩 안전 처리
+- 단계별 폴백 메커니즘
+- 상세 로깅 시스템
+
+## 8. 개발 환경
+- Django 5.2.4
+- MySQL 데이터베이스
+- 외부 API: VITO STT, OpenAI GPT-4o
+- 머신러닝: scikit-learn, LightGBM, KiWi
+
+## 9. 결론
+
+이 프로젝트는 최신 AI 기술을 활용한 실용적인 보이스피싱 탐지 시스템입니다. 
+특히 보류 구간 로직을 통한 2단계 모델 연동과 사용자 피드백 루프가 핵심 차별점입니다.
+
+**장점**:
+- 체계적인 AI 파이프라인
+- 사용자 친화적 인터페이스  
+- 포괄적인 데이터 모델링
+- 안정적인 에러 처리
+
+**개선 필요사항**:
+- 보안 설정 강화 (SECRET_KEY 등)
+- 테스트 코드 추가
+- 프로덕션 환경 설정
