@@ -112,8 +112,8 @@ WSGI_APPLICATION = 'config.wsgi.application'
 #     }
 # }
 # 구글 클라우드 디비 설정
-# import os
-# from dotenv import load_dotenv
+import os
+from dotenv import load_dotenv
 
 load_dotenv()  # Codex에선 무시되고, 로컬에서만 동작
 
