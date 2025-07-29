@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "channels",
 ]
 
 MIDDLEWARE = [
@@ -162,3 +163,13 @@ VITO_API_URL = 'https://openapi.vito.ai/v1'
 # OpenAI API 설정 (백업용)
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 GPT_API_KEY = os.getenv('GPT_API_KEY')
+
+# Channels 설정
+ASGI_APPLICATION = 'config.asgi.application'
+
+# Channel Layer 설정 (개발용 - In-Memory)
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
+    }
+}

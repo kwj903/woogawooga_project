@@ -7,6 +7,7 @@ from .models import (
     AnalysisResult, SystemLog, ProcessdFile, InferenceResult, 
     ModelRegistry, Feedback, VoicePhishingSystemLog
 )
+from .consumers import send_progress_update, send_analysis_complete, send_analysis_error
 import json
 import time
 import random
@@ -950,12 +951,14 @@ RISK_FACTORS: [위험 요소들을 쉼표로 구분, 없으면 '없음']
 
 **보이스피싱 유형 분류 기준:**
 - 기관사칭형: 공공기관(국세청, 경찰청, 금감원 등)을 사칭
-- 지인사칭형: 가족, 친구, 지인을 사칭하여 돈을 요구
-- 택배사칭형: 택배회사를 사칭하여 개인정보 요구
+- 가족지인사칭형: 가족, 친구, 지인을 사칭하여 돈을 요구
 - 대출빙자형: 대출 제안으로 개인정보나 수수료 요구
 - 투자빙자형: 고수익 투자를 미끼로 돈을 요구
 - 수사기관사칭형: 검찰, 경찰 등 수사기관을 사칭
 - 금융기관사칭형: 은행, 카드사 등 금융기관을 사칭
+- 택배사칭형: 택배회사를 사칭하여 개인정보 요구
+- 세금환급형: 세금환급, 환급금 수령 등 명목으로 개인정보, 계좌 요구
+- 콜백스미싱형: 결제 취소, 쇼핑몰 주문 등 문자로 유도 후 연결, 악성앱 설치 유도
 
 **중요 지침:**
 1. 경고 메시지는 구체적이고 실행 가능한 조치를 포함해야 합니다
@@ -1164,6 +1167,14 @@ def index(request):
     """메인 페이지 렌더링"""
     return render(request, 'voice_phishing/index.html')
 
+def analysis(request):
+    """분석 진행 페이지 뷰"""
+    return render(request, 'voice_phishing/analysis.html')
+
+def result(request):
+    """분석 결과 페이지 뷰"""
+    return render(request, 'voice_phishing/result.html')
+
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -1248,11 +1259,13 @@ def analyze(request):
         
         logger.info(f"오디오 파일 저장: {saved_file_path}")
         
-        # 2단계: STT 처리
+        # 2단계: STT 처리 (진행률 업데이트)
+        send_progress_update(ocrn_no, 0, 0, "VITO STT로 음성을 텍스트로 변환하고 있습니다...", "STT 변환")
         try:
             log_system_info("INFO", f"VITO STT 시작: {audio_file.name}", audio_file.name, client_ip)
             transcript = vito_stt(audio_file)
             log_system_info("INFO", f"VITO STT 완료: {len(transcript)} 글자", audio_file.name, client_ip)
+            send_progress_update(ocrn_no, 0, 100, "STT 변환이 완료되었습니다.", "STT 변환")
         except Exception as e:
             SystemLog.objects.create(
                 level='ERROR',
@@ -1262,6 +1275,11 @@ def analyze(request):
             )
             logger.error(f"VITO STT 실패: {str(e)}")
             transcript = "STT 처리에 실패했습니다."
+            send_analysis_error(ocrn_no, f"STT 처리 실패: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'error': 'STT 처리에 실패했습니다.'
+            }, status=500)
         
         # 3단계: 텍스트 전처리
         prcs_cont_1 = preprocess_text(transcript)
@@ -1285,10 +1303,12 @@ def analyze(request):
             file_path=str(saved_file_path.relative_to(BASE_DIR))
         )
         
-        # 5단계: 1차 모델 분석
+        # 5단계: 1차 모델 분석 (진행률 업데이트)
+        send_progress_update(ocrn_no, 1, 0, "1차 ML 모델로 보이스피싱 패턴을 분석하고 있습니다...", "1차 ML 분석")
         log_system_info("INFO", "1차 모델 분석 시작", audio_file.name, client_ip)
         first_model_result = analyze_with_first_model(transcript)
         log_system_info("INFO", f"1차 모델 분석 완료: 예측={first_model_result.get('prediction')}, 신뢰도={first_model_result.get('confidence', 0):.3f}", audio_file.name, client_ip)
+        send_progress_update(ocrn_no, 1, 100, "1차 ML 분석이 완료되었습니다.", "1차 ML 분석")
         
         # 6단계: 2차 모델 분석 (조건부 실행)
         second_model_result = None
@@ -1297,9 +1317,11 @@ def analyze(request):
         dl_jdgm_yn = 'N'  # 딥러닝 판단 여부
         
         if first_model_result['prediction'] == -1:  # 보류 구간
+            send_progress_update(ocrn_no, 2, 0, "2차 DL 모델로 정밀 검증을 진행하고 있습니다...", "2차 DL 분석")
             log_system_info("INFO", "보류 구간 - 2차 모델 분석 시작", audio_file.name, client_ip)
             second_model_result = analyze_with_second_model(transcript)
             log_system_info("INFO", f"2차 모델 분석 완료: 예측={second_model_result.get('prediction')}, 신뢰도={second_model_result.get('confidence', 0):.3f}", audio_file.name, client_ip)
+            send_progress_update(ocrn_no, 2, 100, "2차 DL 분석이 완료되었습니다.", "2차 DL 분석")
             
             # 2차 모델 결과를 최종 결과로 사용
             final_prediction = second_model_result['prediction']
@@ -1308,10 +1330,12 @@ def analyze(request):
         else:
             log_system_info("INFO", f"1차 모델에서 즉시 판별: {first_model_result['decision_type']}", audio_file.name, client_ip)
         
-        # 7단계: LLM 설명 생성 (임시)
+        # 7단계: LLM 설명 생성 (진행률 업데이트)
+        send_progress_update(ocrn_no, 3, 0, "GPT-4가 맞춤형 경고 메시지를 생성하고 있습니다...", "LLM 메시지 생성")
         log_system_info("INFO", "LLM 설명 생성 시작", audio_file.name, client_ip)
         llm_result = generate_llm_explanation(transcript, first_model_result, second_model_result)
         log_system_info("INFO", f"LLM 설명 생성 완료: 유형={llm_result.get('phishing_type', 'Unknown')}", audio_file.name, client_ip)
+        send_progress_update(ocrn_no, 3, 100, "LLM 메시지 생성이 완료되었습니다.", "LLM 메시지 생성")
         
         # 8단계: ModelRegistry 등록
         # 1차 모델 등록
@@ -1457,11 +1481,18 @@ def analyze(request):
             }
         }
         
+        # 분석 완료 메시지 전송
+        send_analysis_complete(ocrn_no, result)
+        
         return JsonResponse(result)
         
     except Exception as e:
         error_type = type(e).__name__
         error_message = str(e)
+        
+        # 오류 메시지 전송 (ocrn_no가 생성된 경우만)
+        if 'ocrn_no' in locals():
+            send_analysis_error(ocrn_no, f"분석 중 오류가 발생했습니다: {error_message}")
         
         # 데이터베이스 관련 오류인지 확인
         if "Data too long" in error_message:

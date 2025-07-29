@@ -1,0 +1,148 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>분석 결과 - WOOGAWOOGA</title>
+    <link rel="stylesheet" href="{% static 'voice_phishing/css/style.css' %}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <svg class="shield-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                </svg>
+                <h1 class="header-title">woogawooga</h1>
+            </div>
+            <div class="breadcrumb">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                </svg>
+                <span id="breadcrumb-text">분석 결과</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Loading Section -->
+            <div id="loadingSection" class="card" style="display: none;">
+                <div class="card-header">
+                    <h2 class="card-title">결과 로딩 중</h2>
+                    <p class="card-description">분석 결과를 불러오고 있습니다...</p>
+                </div>
+                <div class="card-content">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Result -->
+            <div id="errorResult" class="card error-card" style="display: none;">
+                <div class="card-header">
+                    <h2 class="card-title">오류 발생</h2>
+                </div>
+                <div class="card-content">
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span id="errorMessage">결과를 불러올 수 없습니다.</span>
+                    </div>
+                    <div class="error-actions">
+                        <button onclick="window.location.href='/'">
+                            <i class="fas fa-home"></i>
+                            홈으로 돌아가기
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Result Card -->
+            <div id="resultCard" class="card" style="display: none;">
+                <div class="card-header">
+                    <div class="result-badge-container">
+                        <div id="resultBadge" class="result-badge">
+                            <span id="resultText">판별 중</span>
+                        </div>
+                    </div>
+                    <h2 class="card-title">분석 결과</h2>
+                </div>
+                <div class="card-content">
+                    <!-- Final Result -->
+                    <div class="result-section">
+                        <h3>최종 판별 결과</h3>
+                        <div id="finalResult" class="final-result">
+                            <div class="result-item">
+                                <label>유형:</label>
+                                <span id="phishingType">-</span>
+                            </div>
+                            <div class="result-item">
+                                <label>신뢰도:</label>
+                                <span id="confidence">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Warning Message -->
+                    <div id="warningMessage" class="warning-section" style="display: none;">
+                        <div class="warning-header">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <h3>경고 메시지</h3>
+                        </div>
+                        <div id="warningText" class="warning-content">
+                            <!-- 경고 메시지가 여기에 표시됩니다 -->
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="result-actions">
+                        <button onclick="window.location.href='/'">
+                            <i class="fas fa-upload"></i>
+                            새 파일 분석
+                        </button>
+                        <button onclick="showFeedbackForm()">
+                            <i class="fas fa-comment"></i>
+                            피드백 제출
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feedback Form (숨김) -->
+            <div id="feedbackForm" class="card" style="display: none;">
+                <div class="card-header">
+                    <h2 class="card-title">피드백 제출</h2>
+                    <p class="card-description">분석 결과에 대한 의견을 남겨주세요</p>
+                </div>
+                <div class="card-content">
+                    <form id="feedback-form">
+                        <div class="form-group">
+                            <label>분석 결과가 정확했나요?</label>
+                            <div class="radio-group">
+                                <label><input type="radio" name="accuracy" value="correct"> 정확함</label>
+                                <label><input type="radio" name="accuracy" value="incorrect"> 부정확함</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="comment">추가 의견 (선택사항)</label>
+                            <textarea id="comment" name="comment" rows="4" placeholder="의견을 입력해주세요..."></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" onclick="hideFeedbackForm()">취소</button>
+                            <button type="submit">제출</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+    <script src="{% static 'js/result.js' %}"></script>
+</body>
+</html>
