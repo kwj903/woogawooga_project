@@ -1182,7 +1182,9 @@ def analyze(request):
     """음성 파일 분석 API"""
     start_time = time.time()
     client_ip = get_client_ip(request)
-    ocrn_no = str(uuid.uuid4())  # 고유 발생번호 생성
+    # 프론트엔드에서 전달한 task_id가 있으면 이를 사용하고, 없으면 새로 생성
+    task_id = request.POST.get('task_id')
+    ocrn_no = task_id if task_id else str(uuid.uuid4())  # 고유 발생번호
     
     # 분석 시작 로그 (기본 정보 확인용)
     logger.info(f"=== 분석 요청 시작 ===")
