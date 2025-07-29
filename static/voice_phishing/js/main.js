@@ -1,7 +1,18 @@
+// 분석 단계 정의
+const analysisStepsData = [
+  { id: 'stt', title: 'STT 변환', subtitle: 'VITO STT API' },
+  { id: 'ml', title: '1차 ML 분석', subtitle: 'Machine Learning' },
+  { id: 'dl', title: '2차 DL 분석', subtitle: 'Deep Learning' },
+  { id: 'llm', title: 'LLM 메시지 생성', subtitle: 'GPT-4' }
+]
+
 class VoicePhishingDetector {
   constructor() {
     this.currentState = "upload"
     this.selectedFile = null
+    this.websocket = null
+    this.taskId = null
+    this.currentStep = 0
     this.init()
   }
 
@@ -187,42 +198,38 @@ class VoicePhishingDetector {
     analyzeBtn.classList.add('processing')
     analyzeBtn.textContent = '분석 중...'
 
+    // 분석 화면으로 전환 및 단계 UI 초기화
+    this.updateAnalysisSteps(analysisStepsData)
     this.showScreen("analysis")
+
+    // Task ID 생성 후 저장
+    this.taskId = this.generateTaskId()
+    localStorage.setItem('currentTaskId', this.taskId)
+
+    // WebSocket 연결 시작
+    this.connectWebSocket()
 
     try {
       // FormData 생성
       const formData = new FormData()
-      formData.append("audio_file", this.selectedFile)
+      formData.append('audio_file', this.selectedFile)
+      formData.append('task_id', this.taskId)
 
-      // CSRF 토큰 추가
-      const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value
-      formData.append("csrfmiddlewaretoken", csrfToken)
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value
 
-      // 분석 진행 시뮬레이션
-      await this.simulateAnalysisProgress()
-
-      // Django API 호출
-      const response = await fetch("/analyze/", {
-        method: "POST",
-        body: formData,
-        headers: {
-          "X-CSRFToken": csrfToken,
-        },
+      // 백엔드 분석 요청
+      fetch('/analyze/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
+        body: formData
+      }).catch(err => {
+        console.error('분석 요청 오류:', err)
+        this.handleAnalysisError('분석 요청 중 오류가 발생했습니다.')
       })
 
-      const result = await response.json()
-
-      if (result.success) {
-        this.displayResult(result)
-        this.showScreen("result")
-      } else {
-        this.showError(result.error)
-      }
     } catch (error) {
-      console.error("Analysis error:", error)
-      this.showError("네트워크 오류가 발생했습니다. 다시 시도해주세요.")
-    } finally {
-      // 분석 완료 후 버튼 상태 복원
+      console.error('Analysis error:', error)
+      this.handleAnalysisError('분석 시작 중 오류가 발생했습니다.')
       this.resetAnalyzeButton()
     }
   }
@@ -613,6 +620,91 @@ class VoicePhishingDetector {
       overallProgress.style.border = '2px solid #10b981'
       overallProgress.style.backgroundColor = '#ecfdf5'
     }
+  }
+
+  generateTaskId() {
+    return 'task-' + Math.random().toString(36).substr(2, 9)
+  }
+
+  connectWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const wsUrl = `${protocol}//${window.location.host}/ws/analysis/${this.taskId}/`
+    this.websocket = new WebSocket(wsUrl)
+
+    this.websocket.onmessage = (event) => {
+      const data = JSON.parse(event.data)
+      this.handleWebSocketMessage(data)
+    }
+
+    this.websocket.onerror = () => {
+      this.handleAnalysisError('서버와의 연결에 문제가 발생했습니다.')
+    }
+  }
+
+  handleWebSocketMessage(data) {
+    switch (data.type) {
+      case 'progress':
+        this.handleProgressUpdate(data)
+        break
+      case 'complete':
+        this.handleAnalysisComplete(data.result)
+        break
+      case 'error':
+        this.handleAnalysisError(data.message)
+        break
+    }
+  }
+
+  handleProgressUpdate(data) {
+    const { step, progress, message } = data
+    this.currentStep = step
+    this.updateAnalysisStep(step, progress === 100 ? 'completed' : 'processing', progress)
+    this.updateStatusMessage(message)
+    for (let i = 0; i < step; i++) {
+      this.updateAnalysisStep(i, 'completed', 100)
+    }
+  }
+
+  updateAnalysisStep(stepIndex, status, progress) {
+    const stepInfo = analysisStepsData[stepIndex]
+    if (!stepInfo) return
+    const stepEl = document.getElementById(`step-${stepInfo.id}`)
+    if (!stepEl) return
+
+    const spinner = stepEl.querySelector('.step-spinner')
+    const check = stepEl.querySelector('.step-check')
+    const statusEl = stepEl.querySelector('.step-status')
+    const bar = stepEl.querySelector('.progress-fill')
+    const percent = stepEl.querySelector('.progress-percent')
+
+    if (statusEl) {
+      if (status === 'processing') statusEl.textContent = '진행 중'
+      else if (status === 'completed') statusEl.textContent = '완료'
+      else statusEl.textContent = '오류'
+    }
+    if (spinner) spinner.classList.toggle('hidden', status !== 'processing')
+    if (check) check.classList.toggle('hidden', status !== 'completed')
+    if (bar) bar.style.width = `${progress}%`
+    if (percent) percent.textContent = `${Math.round(progress)}%`
+    this.updateTotalProgress(progress)
+  }
+
+  handleAnalysisComplete(result) {
+    if (this.websocket) {
+      this.websocket.close()
+    }
+    analysisStepsData.forEach((_, idx) => this.updateAnalysisStep(idx, 'completed', 100))
+    this.updateStatusMessage('분석이 완료되었습니다. 결과 페이지로 이동합니다...')
+    localStorage.setItem('analysisResult', JSON.stringify(result))
+    setTimeout(() => {
+      this.displayResult(result)
+      this.showScreen('result')
+    }, 500)
+  }
+
+  handleAnalysisError(message) {
+    this.updateStatusMessage(message)
+    this.showScreen('error')
   }
 
   setupFeedbackListeners() {
