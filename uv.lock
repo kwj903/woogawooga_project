@@ -462,6 +462,19 @@ wheels = [
 ]
 
 [[package]]
+name = "channels"
+version = "4.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "asgiref" },
+    { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/72/04/6768c7a887f9c593c4d49f99130c8aec4ea06e750bc17c306b689f6caf3b/channels-4.3.0.tar.gz", hash = "sha256:7db32c61dcd88eada1647e6c6f6ad2eb724b75d4852eeff26ad1c51ccd1a37f7", size = 26816 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7c/59/0866202ee593e1b0dab0b472ebb8169e1b2b7886ad3008d193da2bbe10cb/channels-4.3.0-py3-none-any.whl", hash = "sha256:0497f3affb95e621b37d6bae1b6a5d9e8e1e1221007a2566f280091cf30ffcce", size = 31238 },
+]
+
+[[package]]
 name = "charset-normalizer"
 version = "3.4.2"
 source = { registry = "https://pypi.org/simple" }
@@ -5549,6 +5562,7 @@ name = "woogawooga-project"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "channels" },
     { name = "django" },
     { name = "google-generativeai" },
     { name = "imbalanced-learn" },
@@ -5595,6 +5609,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "channels", specifier = ">=4.3.0" },
     { name = "django", specifier = ">=5.2.4" },
     { name = "google-generativeai", specifier = ">=0.8.5" },
     { name = "imbalanced-learn", specifier = ">=0.12.4" },

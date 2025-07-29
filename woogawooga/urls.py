@@ -7,6 +7,9 @@ urlpatterns = [
     # 메인 페이지
     path('', views.index, name='index'),
     
+    # 분석 및 결과 페이지
+    path('analysis/', views.analysis, name='analysis'),
+    path('result/', views.result, name='result'),
     
     # 분석 API
     path('analyze/', views.analyze, name='analyze'),
