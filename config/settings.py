@@ -98,17 +98,36 @@ WSGI_APPLICATION = 'config.wsgi.application'
 #         "CHARSET": "utf8mb4",  # 4바이트  UTF-8
 #     }
 # }
+# DATABASES = {
+#     "default": {
+#         "ENGINE": os.getenv("DB_ENGINE"),
+#         "NAME": os.getenv("DB_NAME"),
+#         "USER": os.getenv("DB_USER"),
+#         "PASSWORD": os.getenv("DB_PASSWORD"),
+#         "HOST": os.getenv("DB_HOST"),
+#         "PORT": os.getenv("DB_PORT"),
+#         "OPTIONS": {
+#             "charset": os.getenv("DB_CHARSET"),
+#         },
+#     }
+# }
+# 구글 클라우드 디비 설정
+# import os
+# from dotenv import load_dotenv
+
+load_dotenv()  # Codex에선 무시되고, 로컬에서만 동작
+
 DATABASES = {
-    "default": {
-        "ENGINE": os.getenv("DB_ENGINE"),
-        "NAME": os.getenv("DB_NAME"),
-        "USER": os.getenv("DB_USER"),
-        "PASSWORD": os.getenv("DB_PASSWORD"),
-        "HOST": os.getenv("DB_HOST"),
-        "PORT": os.getenv("DB_PORT"),
-        "OPTIONS": {
-            "charset": os.getenv("DB_CHARSET"),
-        },
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
+        'OPTIONS': {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        }
     }
 }
 
