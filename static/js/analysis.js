@@ -47,11 +47,22 @@ function generateTaskId() {
 // 페이지 초기화
 function initializeAnalysis() {
   // URL에서 Task ID 가져오기
-  currentTaskId = getUrlParameter("taskId") || getFromStorage("currentTaskId") || generateTaskId()
+  currentTaskId = getUrlParameter("taskId") || getFromStorage("currentTaskId")
+  
+  if (!currentTaskId) {
+    console.error('TaskID를 찾을 수 없습니다. 메인 페이지로 이동합니다.')
+    window.location.href = '/'
+    return
+  }
+
+  console.log('분석 페이지 초기화, TaskID:', currentTaskId)
 
   if (taskIdElement) {
     taskIdElement.textContent = currentTaskId
   }
+
+  // 분석 단계 초기화
+  initializeAnalysisSteps()
 
   // WebSocket 연결 시작
   connectWebSocket()
@@ -114,39 +125,92 @@ function handleWebSocketMessage(data) {
 // 진행률 업데이트 처리
 function handleProgressUpdate(data) {
   const { step, progress, message, step_name } = data
+  console.log(`진행률 업데이트: 단계=${step}, 진행률=${progress}%, 메시지=${message}`)
   
   // 현재 단계 업데이트
   currentStep = step
-  
-  // 단계 상태 업데이트
-  updateAnalysisStep(step, progress === 100 ? "completed" : "processing", progress)
-  
-  // 상태 메시지 업데이트
-  currentStatus.textContent = message
   
   // 이전 단계들을 완료 상태로 설정
   for (let i = 0; i < step; i++) {
     updateAnalysisStep(i, "completed", 100)
   }
+  
+  // 현재 단계 상태 업데이트
+  const status = progress === 100 ? "completed" : "processing"
+  updateAnalysisStep(step, status, progress)
+  
+  // 상태 메시지 업데이트
+  const statusTextEl = document.getElementById('current-status-text')
+  if (statusTextEl) {
+    statusTextEl.textContent = message
+  }
+}
+
+// 분석 단계 초기화
+function initializeAnalysisSteps() {
+  // 분석 단계 HTML이 제대로 로드되어 있는지 확인
+  const stepsContainer = document.getElementById('analysisSteps')
+  if (!stepsContainer) {
+    console.error('분석 단계 컨테이너를 찾을 수 없습니다.')
+    return
+  }
+  
+  console.log('분석 단계 초기화 완료')
 }
 
 // 분석 단계 업데이트
 function updateAnalysisStep(stepIndex, status, progress) {
-  const stepElement = analysisSteps.children[stepIndex]
-  if (!stepElement) return
-
-  const iconElement = stepElement.querySelector(".step-icon i")
-  const progressBar = stepElement.querySelector(".progress-fill")
-  const progressPercent = stepElement.querySelector(".progress-percent")
-
-  // 아이콘 업데이트
-  iconElement.className = getStepIconClass(status)
-
-  // 진행률 업데이트
-  if (progressBar && progressPercent) {
-    progressBar.style.width = `${progress}%`
-    progressPercent.textContent = `${Math.round(progress)}%`
+  const stepInfo = steps[stepIndex]
+  if (!stepInfo) {
+    console.warn(`단계 정보를 찾을 수 없습니다: ${stepIndex}`)
+    return
   }
+  
+  const stepElement = document.getElementById(`step-${stepInfo.key}`)
+  if (!stepElement) {
+    console.warn(`단계 요소를 찾을 수 없습니다: step-${stepInfo.key}`)
+    return
+  }
+
+  // 단계 상태 업데이트
+  stepElement.classList.remove('active', 'completed')
+  if (status === 'processing') {
+    stepElement.classList.add('active')
+  } else if (status === 'completed') {
+    stepElement.classList.add('completed')
+  }
+
+  const spinner = stepElement.querySelector('.step-spinner')
+  const check = stepElement.querySelector('.step-check')
+  const statusEl = stepElement.querySelector('.step-status')
+
+  if (statusEl) {
+    if (status === 'processing') statusEl.textContent = '진행 중'
+    else if (status === 'completed') statusEl.textContent = '완료'
+    else if (status === 'error') statusEl.textContent = '오류'
+    else statusEl.textContent = '대기'
+  }
+  
+  if (spinner) {
+    spinner.classList.toggle('hidden', status !== 'processing')
+  }
+  
+  if (check) {
+    check.classList.toggle('hidden', status !== 'completed')
+  }
+  
+  // 세부 상태 메시지 표시
+  const detailEl = stepElement.querySelector('.step-detail')
+  if (detailEl && status === 'processing') {
+    detailEl.classList.remove('hidden')
+    detailEl.textContent = `진행 중... ${Math.round(progress)}%`
+  } else if (detailEl && status === 'completed') {
+    detailEl.textContent = '완료'
+  }
+  
+  // 전체 진행률 업데이트
+  const totalProgress = (stepIndex * 25) + (progress * 0.25)
+  updateOverallProgress(Math.min(totalProgress, 100))
 }
 
 // 단계별 아이콘 클래스 반환
@@ -164,8 +228,24 @@ function getStepIconClass(status) {
 }
 
 
+// 전체 진행률 업데이트
+function updateOverallProgress(progress) {
+  const overallProgressFill = document.getElementById('overall-progress-fill')
+  const overallPercentage = document.getElementById('overall-percentage')
+  
+  if (overallProgressFill) {
+    overallProgressFill.style.width = `${progress}%`
+  }
+  
+  if (overallPercentage) {
+    overallPercentage.textContent = `${Math.round(progress)}%`
+  }
+}
+
 // 분석 완료 처리
 function handleAnalysisComplete(result) {
+  console.log('분석 완료:', result)
+  
   isAnalysisComplete = true
   
   // WebSocket 연결 종료
@@ -178,7 +258,13 @@ function handleAnalysisComplete(result) {
     updateAnalysisStep(i, "completed", 100)
   }
   
-  currentStatus.textContent = "분석이 완료되었습니다. 결과 페이지로 이동합니다..."
+  // 전체 진행률 100%로 설정
+  updateOverallProgress(100)
+  
+  const statusTextEl = document.getElementById('current-status-text')
+  if (statusTextEl) {
+    statusTextEl.textContent = "분석이 완료되었습니다. 결과 페이지로 이동합니다..."
+  }
   
   // 결과를 localStorage에 저장
   saveToStorage("analysisResult", result)
@@ -210,8 +296,23 @@ function retryAnalysis() {
 
 // 오류 처리
 function handleAnalysisError(message) {
-  currentStatus.textContent = message
-  errorSection.style.display = "block"
+  console.error('분석 오류:', message)
+  
+  // WebSocket 연결 종료
+  if (websocket) {
+    websocket.close()
+  }
+  
+  // 상태 메시지 업데이트
+  const statusTextEl = document.getElementById('current-status-text')
+  if (statusTextEl) {
+    statusTextEl.textContent = message
+  }
+  
+  // 오류 섹션 표시
+  if (errorSection) {
+    errorSection.style.display = "block"
+  }
 
   // 현재 단계를 오류 상태로 변경
   if (currentStep < steps.length) {

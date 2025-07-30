@@ -711,6 +711,10 @@ body {
 /* 분석 단계 스타일 */
 .analysis-steps {
   margin: 2rem 0;
+  padding: 1rem;
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .analysis-header {
@@ -733,51 +737,70 @@ body {
 .step-item {
   display: flex;
   align-items: center;
-  padding: 1rem;
+  padding: 1.25rem;
   margin-bottom: 1rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.75rem;
   background: #f9fafb;
   transition: all 0.3s ease;
+  position: relative;
 }
 
 .step-item.active {
   border-color: #3b82f6;
   background: #eff6ff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  transform: translateY(-2px);
 }
 
 .step-item.completed {
   border-color: #10b981;
   background: #f0fdf4;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
 }
 
 .step-icon {
-  margin-right: 1rem;
+  margin-right: 1.5rem;
+  flex-shrink: 0;
 }
 
 .step-circle {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 3rem;
+  height: 3rem;
   border-radius: 50%;
   background: #e5e7eb;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  transition: all 0.3s ease;
+  border: 3px solid transparent;
 }
 
 .step-item.active .step-circle {
   background: #3b82f6;
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
 }
 
 .step-item.completed .step-circle {
   background: #10b981;
+  border-color: #059669;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
 }
 
 .step-check {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
   color: white;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.3s ease;
+}
+
+.step-item.completed .step-check {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .step-spinner {
@@ -789,73 +812,116 @@ body {
 }
 
 .spinner {
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid transparent;
-  border-top: 2px solid white;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2.5px solid transparent;
+  border-top: 2.5px solid white;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
 
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 .step-content {
   flex: 1;
+  min-width: 0;
 }
 
 .step-title {
-  font-weight: 600;
+  font-weight: 700;
   color: #1f2937;
-  font-size: 1rem;
+  font-size: 1.125rem;
   margin-bottom: 0.25rem;
+  transition: color 0.3s ease;
+}
+
+.step-item.active .step-title {
+  color: #1d4ed8;
+}
+
+.step-item.completed .step-title {
+  color: #059669;
 }
 
 .step-subtitle {
-  color: #3b82f6;
+  color: #6b7280;
   font-size: 0.875rem;
   font-weight: 500;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.8;
+}
+
+.step-item.active .step-subtitle {
+  color: #3b82f6;
+  opacity: 1;
+}
+
+.step-item.completed .step-subtitle {
+  color: #10b981;
+  opacity: 1;
 }
 
 .step-detail {
   color: #6b7280;
   font-size: 0.875rem;
   margin-top: 0.5rem;
-  padding: 0.5rem;
+  padding: 0.75rem;
   background: #f3f4f6;
-  border-radius: 0.25rem;
+  border-radius: 0.375rem;
+  border-left: 3px solid transparent;
+  transition: all 0.3s ease;
 }
 
 .step-item.active .step-detail {
   background: #dbeafe;
   color: #1e40af;
+  border-left-color: #3b82f6;
 }
 
 .step-item.completed .step-detail {
   background: #d1fae5;
   color: #065f46;
+  border-left-color: #10b981;
 }
 
 .step-status {
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   color: #6b7280;
-  min-width: 4rem;
+  min-width: 5rem;
   text-align: right;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  background: #f3f4f6;
+  transition: all 0.3s ease;
 }
 
 .step-item.active .step-status {
-  color: #3b82f6;
+  color: white;
+  background: #3b82f6;
 }
 
 .step-item.completed .step-status {
-  color: #10b981;
+  color: white;
+  background: #10b981;
 }
 
 .overall-progress {
   margin: 2rem 0;
   padding: 1.5rem;
-  background: white;
-  border-radius: 0.5rem;
-  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  border-radius: 0.75rem;
+  border: 2px solid #e5e7eb;
+  transition: all 0.3s ease;
+}
+
+.overall-progress.completed {
+  border-color: #10b981;
+  background: #ecfdf5;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
 }
 
 .progress-label {

@@ -43,13 +43,13 @@ function loadAnalysisResult() {
       analysisResult = JSON.parse(analysisResultStr)
       console.log('로드된 분석 결과:', analysisResult)
       
-      // 실제 API 결과인지 확인
-      if (analysisResult.success && (analysisResult.rslt_id || analysisResult.ocrn_no)) {
-        console.log('실제 분석 결과 사용')
+      // API 결과 유효성 검증
+      if (analysisResult && analysisResult.success !== false) {
+        console.log('분석 결과 표시 시작')
         displayResult(analysisResult)
       } else {
-        console.warn('불완전한 분석 결과, 재분석 필요')
-        showError("분석 결과가 불완전합니다. 다시 분석해주세요.")
+        console.warn('분석 결과가 유효하지 않음:', analysisResult)
+        showError("분석이 실패했습니다. 다시 분석해주세요.")
       }
     } catch (error) {
       console.error('분석 결과 파싱 오류:', error)
@@ -57,7 +57,13 @@ function loadAnalysisResult() {
     }
   } else {
     console.log('저장된 분석 결과가 없음')
-    showError("분석 결과를 찾을 수 없습니다. 먼저 음성 파일을 분석해주세요.")
+    // 실제 운영 환경에서는 목업 결과를 생성하지 않음
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      console.warn('개발 모드: Mock 결과 생성')
+      generateMockResult()
+    } else {
+      showError("분석 결과를 찾을 수 없습니다. 먼저 음성 파일을 분석해주세요.")
+    }
   }
 }
 
@@ -607,13 +613,8 @@ function retryAnalysis() {
   // 3. DOM 요소 완전 초기화
   clearAllDOMElements()
   
-  // 4. 강제 새로고침으로 홈페이지 이동 (캐시 무시)
-  window.location.replace('/')
-  
-  // 5. 추가 보장: 페이지 새로고침
-  setTimeout(() => {
-    window.location.reload(true)  // 강제 새로고침 (캐시 무시)
-  }, 100)
+  // 4. 메인 페이지로 이동 (캐시 무시)
+  window.location.href = '/'
 }
 
 // 홈으로 이동 시 완전 새로고침
@@ -629,13 +630,8 @@ function goHome() {
   // 3. DOM 요소 완전 초기화
   clearAllDOMElements()
   
-  // 4. 강제 새로고침으로 홈페이지 이동 (캐시 무시)
-  window.location.replace('/')
-  
-  // 5. 추가 보장: 페이지 새로고침
-  setTimeout(() => {
-    window.location.reload(true)  // 강제 새로고침 (캐시 무시)
-  }, 100)
+  // 4. 메인 페이지로 이동
+  window.location.href = '/'
 }
 
 // 모든 분석 관련 데이터 완전 제거

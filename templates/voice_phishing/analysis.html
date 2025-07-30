@@ -40,64 +40,97 @@
                 <div class="card-content">
                     <!-- 분석 단계 표시 -->
                     <div id="analysisSteps" class="analysis-steps">
-                        <div class="step">
+                        <div class="step-item" id="step-stt">
                             <div class="step-icon">
-                                <i class="fas fa-microphone step-pending"></i>
+                                <div class="step-circle">
+                                    <svg class="step-check hidden" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <div class="step-spinner hidden">
+                                        <div class="spinner"></div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="step-content">
                                 <div class="step-title">STT 변환</div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 0%"></div>
-                                </div>
-                                <div class="progress-percent">0%</div>
+                                <div class="step-subtitle">VITO STT API</div>
+                                <div class="step-detail hidden">VITO API로 음성을 텍스트로 변환</div>
                             </div>
+                            <div class="step-status">진행 대기</div>
                         </div>
 
-                        <div class="step">
+                        <div class="step-item" id="step-ml">
                             <div class="step-icon">
-                                <i class="fas fa-brain step-pending"></i>
+                                <div class="step-circle">
+                                    <svg class="step-check hidden" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <div class="step-spinner hidden">
+                                        <div class="spinner"></div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="step-content">
                                 <div class="step-title">1차 ML 분석</div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 0%"></div>
-                                </div>
-                                <div class="progress-percent">0%</div>
+                                <div class="step-subtitle">Machine Learning</div>
+                                <div class="step-detail hidden">머신러닝 모델로 1차 분석</div>
                             </div>
+                            <div class="step-status">진행 대기</div>
                         </div>
 
-                        <div class="step">
+                        <div class="step-item" id="step-dl">
                             <div class="step-icon">
-                                <i class="fas fa-robot step-pending"></i>
+                                <div class="step-circle">
+                                    <svg class="step-check hidden" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <div class="step-spinner hidden">
+                                        <div class="spinner"></div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="step-content">
                                 <div class="step-title">2차 DL 분석</div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 0%"></div>
-                                </div>
-                                <div class="progress-percent">0%</div>
+                                <div class="step-subtitle">Deep Learning</div>
+                                <div class="step-detail hidden">딥러닝 모델로 정밀 분석</div>
                             </div>
+                            <div class="step-status">진행 대기</div>
                         </div>
 
-                        <div class="step">
+                        <div class="step-item" id="step-llm">
                             <div class="step-icon">
-                                <i class="fas fa-comments step-pending"></i>
+                                <div class="step-circle">
+                                    <svg class="step-check hidden" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <div class="step-spinner hidden">
+                                        <div class="spinner"></div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="step-content">
                                 <div class="step-title">LLM 메시지 생성</div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 0%"></div>
-                                </div>
-                                <div class="progress-percent">0%</div>
+                                <div class="step-subtitle">GPT-4</div>
+                                <div class="step-detail hidden">AI가 분석 결과 설명 생성</div>
+                            </div>
+                            <div class="step-status">진행 대기</div>
+                        </div>
+                        
+                        <div class="overall-progress">
+                            <div class="progress-label">
+                                <span>전체 진행률</span>
+                                <span id="overall-percentage">0%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div id="overall-progress-fill" class="progress-fill" style="width: 0%"></div>
                             </div>
                         </div>
                     </div>
 
                     <!-- 현재 상태 메시지 -->
-                    <div class="status-section">
+                    <div class="current-status">
                         <div class="status-message">
-                            <i class="fas fa-info-circle"></i>
-                            <span id="currentStatus">분석을 준비하고 있습니다...</span>
+                            <p id="current-status-text">분석을 시작합니다...</p>
                         </div>
                     </div>
 
@@ -119,6 +152,6 @@
 
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
-    <script src="{% static 'js/analysis.js' %}"></script>
+    <script src="{% static 'voice_phishing/js/main.js' %}"></script>
 </body>
 </html>
