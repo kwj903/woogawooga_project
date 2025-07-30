@@ -23,6 +23,62 @@ import requests
 import tempfile
 from django.conf import settings
 
+# 로거 설정
+logger = logging.getLogger(__name__)
+
+# 터미널 출력을 위한 헬퍼 함수들
+def log_and_print(level, message):
+    """로깅과 프린트를 동시에 수행하는 함수 (한글 인코딩 문제 해결)"""
+    try:
+        # 로깅 수행
+        if level.upper() == 'INFO':
+            logger.info(message)
+        elif level.upper() == 'WARNING':
+            logger.warning(message)
+        elif level.upper() == 'ERROR':
+            logger.error(message)
+        elif level.upper() == 'DEBUG':
+            logger.debug(message)
+        
+        # 터미널에 직접 출력 (UTF-8 인코딩 보장)
+        print(f"[{level.upper()}] {message}", flush=True)
+        
+    except UnicodeEncodeError:
+        # 인코딩 문제 발생 시 영어로 대체
+        safe_message = message.encode('ascii', errors='ignore').decode('ascii')
+        print(f"[{level.upper()}] {safe_message} [ENCODING_ERROR]", flush=True)
+        if level.upper() == 'INFO':
+            logger.info(safe_message + " [ENCODING_ERROR]")
+        elif level.upper() == 'WARNING':
+            logger.warning(safe_message + " [ENCODING_ERROR]")
+        elif level.upper() == 'ERROR':
+            logger.error(safe_message + " [ENCODING_ERROR]")
+
+def print_separator():
+    """구분선 출력"""
+    separator = "=" * 80
+    print(separator, flush=True)
+    logger.info(separator)
+
+# 서버 시작 시 로깅 테스트
+print_separator()
+log_and_print("INFO", "[STARTUP] WOOGAWOOGA App Load Complete")
+log_and_print("INFO", "   Logging System Activated")
+log_and_print("INFO", f"   Logger Name: {logger.name}")
+log_and_print("INFO", f"   Log Level: {logger.level}")
+log_and_print("INFO", f"   Handler Count: {len(logger.handlers)}")
+print_separator()
+
+# 로깅 테스트 함수들
+def test_logging_levels():
+    log_and_print("DEBUG", "[DEBUG] DEBUG Level Test")
+    log_and_print("INFO", "[INFO] INFO Level Test")
+    log_and_print("WARNING", "[WARNING] WARNING Level Test")
+    log_and_print("ERROR", "[ERROR] ERROR Level Test")
+
+# 앱 로드 시 로깅 레벨 테스트 실행
+test_logging_levels()
+
 # 머신러닝 및 자연어 처리
 try:
     from kiwipiepy import Kiwi
@@ -32,11 +88,9 @@ try:
     import torch.nn.functional as F
     from transformers import AutoTokenizer, AutoModel
     from torch.utils.data import Dataset, DataLoader
+    logger.info("머신러닝 패키지 import 완료")
 except ImportError as e:
     logger.warning(f"필수 패키지 import 실패: {e}")
-
-# 로거 설정
-logger = logging.getLogger(__name__)
 
 def refresh_vito_token():
     """VITO API 토큰 갱신"""
@@ -77,11 +131,7 @@ def refresh_vito_token():
         logger.error(f"VITO 토큰 갱신 오류: {e}")
         return None
 
-# 로깅 레벨 설정
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# 로깅 설정은 Django settings.py에서 관리됩니다
 
 # KoBERT 기반 PyTorch 모델 클래스 정의
 class TextOnlyPhishingDetector(nn.Module):
@@ -1153,6 +1203,46 @@ def log_system_info(level, message, file_name=None, ip_address=None):
         logger.error(f"스택 트레이스: {traceback.format_exc()}")
         return None
 
+@csrf_exempt
+@require_http_methods(["POST"])
+def log_frontend_event(request):
+    """프론트엔드에서 전송된 로그 이벤트를 처리"""
+    try:
+        data = json.loads(request.body)
+        client_ip = get_client_ip(request)
+        
+        # 프론트엔드 로그를 시스템 로그에 기록
+        log_entry = log_system_info(
+            level=data.get('level', 'INFO'),
+            message=f"[FRONTEND] {data.get('message', '')}",
+            file_name=data.get('file_name', 'FRONTEND'),
+            ip_address=client_ip
+        )
+        
+        if log_entry:
+            return JsonResponse({
+                'success': True,
+                'log_id': log_entry.id,
+                'message': '프론트엔드 로그가 성공적으로 기록되었습니다.'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': '로그 기록에 실패했습니다.'
+            }, status=500)
+            
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': '잘못된 JSON 형식입니다.'
+        }, status=400)
+    except Exception as e:
+        logger.error(f"프론트엔드 로그 처리 오류: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': '서버 내부 오류가 발생했습니다.'
+        }, status=500)
+
 def get_client_ip(request):
     """클라이언트 IP 주소 가져오기"""
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -1251,21 +1341,58 @@ def analyze(request):
             }, status=400)
         
         # 1단계: 오디오 파일 저장
+        print_separator()
+        log_and_print("INFO", "[FILE UPLOAD] File Upload Stage Started")
+        log_and_print("INFO", f"   Request ID: {ocrn_no}")
+        log_and_print("INFO", f"   File Name: {audio_file.name}")
+        log_and_print("INFO", f"   File Size: {audio_file.size:,} bytes ({audio_file.size/1024/1024:.2f} MB)")
+        log_and_print("INFO", f"   File Type: {file_extension}")
+        log_and_print("INFO", f"   Client IP: {client_ip}")
+        
         upload_dir = BASE_DIR / 'media' / 'uploads'
         upload_dir.mkdir(parents=True, exist_ok=True)
         
         saved_file_path = upload_dir / f"{ocrn_no}_{audio_file.name}"
+        
+        log_and_print("INFO", "[FILE SAVE] File Saving Started...")
+        log_and_print("INFO", f"   Save Path: {saved_file_path}")
+        
         with open(saved_file_path, 'wb') as f:
             for chunk in audio_file.chunks():
                 f.write(chunk)
         
-        logger.info(f"오디오 파일 저장: {saved_file_path}")
+        log_and_print("INFO", f"[SUCCESS] File Save Complete: {saved_file_path}")
+        log_and_print("INFO", f"   Saved File Size: {saved_file_path.stat().st_size:,} bytes")
         
         # 2단계: STT 처리 (진행률 업데이트)
+        print_separator()
+        log_and_print("INFO", "[STT] STT Conversion Stage Started")
+        log_and_print("INFO", f"   Request ID: {ocrn_no}")
+        log_and_print("INFO", f"   Using VITO API")
+        log_and_print("INFO", f"   File: {audio_file.name}")
+        
         send_progress_update(ocrn_no, 0, 0, "VITO STT로 음성을 텍스트로 변환하고 있습니다...", "STT 변환")
         try:
             log_system_info("INFO", f"VITO STT 시작: {audio_file.name}", audio_file.name, client_ip)
+            
+            log_and_print("INFO", "[VITO] Calling VITO API...")
+            start_time = time.time()
             transcript = vito_stt(audio_file)
+            end_time = time.time()
+            
+            log_and_print("INFO", "[SUCCESS] VITO STT Conversion Complete!")
+            log_and_print("INFO", f"   Processing Time: {end_time - start_time:.2f} seconds")
+            log_and_print("INFO", f"   Converted Text Length: {len(transcript):,} characters")
+            log_and_print("INFO", f"   Text Preview (first 200 chars): {transcript[:200]}...")
+            
+            # STT 품질 검증
+            if len(transcript.strip()) < 10:
+                log_and_print("WARNING", "[WARNING] STT result too short (less than 10 characters)")
+            elif "[VITO API 오류" in transcript:
+                log_and_print("WARNING", "[WARNING] Using mock data due to STT API error")
+            else:
+                log_and_print("INFO", "[SUCCESS] STT quality validation passed")
+                
             log_system_info("INFO", f"VITO STT 완료: {len(transcript)} 글자", audio_file.name, client_ip)
             send_progress_update(ocrn_no, 0, 100, "STT 변환이 완료되었습니다.", "STT 변환")
         except Exception as e:
@@ -1284,14 +1411,33 @@ def analyze(request):
             }, status=500)
         
         # 3단계: 텍스트 전처리
+        print_separator()
+        log_and_print("INFO", "[PREPROCESS] Text Preprocessing Stage Started")
+        log_and_print("INFO", f"   Original Text Length: {len(transcript):,} characters")
+        
         prcs_cont_1 = preprocess_text(transcript)
         prcs_cont_2 = {"processed_text": transcript}  # 2차 전처리는 임시
         
+        log_and_print("INFO", "[SUCCESS] Text Preprocessing Complete")
+        log_and_print("INFO", f"   1st Processing Result: {len(str(prcs_cont_1)):,} characters")
+        log_and_print("INFO", f"   2nd Processing Result: {len(str(prcs_cont_2)):,} characters")
+        
         # 4단계: 파일 정보 저장 (파일명 길이 제한 처리)
+        print_separator()
+        log_and_print("INFO", "[DATABASE] Database Save Stage Started")
+        log_and_print("INFO", "   Inserting data into ProcessdFile table")
+        
         file_name = audio_file.name
         if len(file_name) > 295:  # 300자 제한에서 여유분 5자
             file_name = file_name[:295] + "..."
-            logger.warning(f"파일명 길이 제한으로 자름: 원본 {len(audio_file.name)}자 -> {len(file_name)}자")
+            log_and_print("WARNING", f"[WARNING] Filename truncated: {len(audio_file.name)} -> {len(file_name)} chars")
+        
+        log_and_print("INFO", "[DB CREATE] Creating database record...")
+        log_and_print("INFO", f"   ocrn_no: {ocrn_no}")
+        log_and_print("INFO", f"   trsc_file_nm: {file_name}")
+        log_and_print("INFO", f"   transcript length: {len(transcript):,} chars")
+        log_and_print("INFO", f"   vldtn_yn: Y")
+        log_and_print("INFO", f"   file_path: {str(saved_file_path.relative_to(BASE_DIR))}")
         
         processed_file = ProcessdFile.objects.create(
             ocrn_no=ocrn_no,
@@ -1305,23 +1451,79 @@ def analyze(request):
             file_path=str(saved_file_path.relative_to(BASE_DIR))
         )
         
+        log_and_print("INFO", "[SUCCESS] ProcessdFile Record Created")
+        log_and_print("INFO", f"   Generated Record ID: {processed_file.id}")
+        
         # 5단계: 1차 모델 분석 (진행률 업데이트)
+        print_separator()
+        log_and_print("INFO", "[ML ANALYSIS] 1st ML Model Analysis Stage Started")
+        log_and_print("INFO", f"   Model Type: Stacking (LightGBM + SVM + Logistic)")
+        log_and_print("INFO", f"   Input Text Length: {len(transcript):,} characters")
+        log_and_print("INFO", f"   Request ID: {ocrn_no}")
+        
         send_progress_update(ocrn_no, 1, 0, "1차 ML 모델로 보이스피싱 패턴을 분석하고 있습니다...", "1차 ML 분석")
         log_system_info("INFO", "1차 모델 분석 시작", audio_file.name, client_ip)
+        
+        start_time = time.time()
         first_model_result = analyze_with_first_model(transcript)
+        end_time = time.time()
+        
+        # 결과 해석
+        prediction = first_model_result.get('prediction', 0)
+        confidence = first_model_result.get('confidence', 0)
+        
+        prediction_text = {
+            0: "Normal Call",
+            1: "Voice Phishing",
+            -1: "Hold (2nd Analysis Required)"
+        }.get(prediction, "Unknown")
+        
+        log_and_print("INFO", "[SUCCESS] 1st ML Model Analysis Complete!")
+        log_and_print("INFO", f"   Processing Time: {end_time - start_time:.3f} seconds")
+        log_and_print("INFO", f"   Prediction Result: {prediction} ({prediction_text})")
+        log_and_print("INFO", f"   Confidence: {confidence:.4f} ({confidence*100:.2f}%)")
+        log_and_print("INFO", f"   Model Response: {first_model_result}")
+        
         log_system_info("INFO", f"1차 모델 분석 완료: 예측={first_model_result.get('prediction')}, 신뢰도={first_model_result.get('confidence', 0):.3f}", audio_file.name, client_ip)
         send_progress_update(ocrn_no, 1, 100, "1차 ML 분석이 완료되었습니다.", "1차 ML 분석")
         
         # 6단계: 2차 모델 분석 (조건부 실행)
+        print_separator()
+        log_and_print("INFO", "[DL ANALYSIS] 2nd DL Model Analysis Stage")
+        
         second_model_result = None
         final_prediction = first_model_result['prediction']
         final_confidence = first_model_result['confidence']
         dl_jdgm_yn = 'N'  # 딥러닝 판단 여부
         
         if first_model_result['prediction'] == -1:  # 보류 구간
+            log_and_print("INFO", "[DL START] Hold zone detected - Starting 2nd DL model analysis")
+            log_and_print("INFO", f"   Model Type: KoBERT + LSTM")
+            log_and_print("INFO", f"   1st Model Confidence: {first_model_result['confidence']:.4f}")
+            log_and_print("INFO", f"   Detailed analysis required")
+            
             send_progress_update(ocrn_no, 2, 0, "2차 DL 모델로 정밀 검증을 진행하고 있습니다...", "2차 DL 분석")
             log_system_info("INFO", "보류 구간 - 2차 모델 분석 시작", audio_file.name, client_ip)
+            
+            start_time = time.time()
             second_model_result = analyze_with_second_model(transcript)
+            end_time = time.time()
+            
+            # 2차 모델 결과 해석
+            dl_prediction = second_model_result.get('prediction', 0)
+            dl_confidence = second_model_result.get('confidence', 0)
+            
+            dl_prediction_text = {
+                0: "Normal Call",
+                1: "Voice Phishing"
+            }.get(dl_prediction, "Unknown")
+            
+            log_and_print("INFO", f"[SUCCESS] 2nd DL Model Analysis Complete!")
+            log_and_print("INFO", f"   Processing Time: {end_time - start_time:.3f} seconds")
+            log_and_print("INFO", f"   Prediction Result: {dl_prediction} ({dl_prediction_text})")
+            log_and_print("INFO", f"   Confidence: {dl_confidence:.4f} ({dl_confidence*100:.2f}%)")
+            log_and_print("INFO", f"   Model Response: {second_model_result}")
+            
             log_system_info("INFO", f"2차 모델 분석 완료: 예측={second_model_result.get('prediction')}, 신뢰도={second_model_result.get('confidence', 0):.3f}", audio_file.name, client_ip)
             send_progress_update(ocrn_no, 2, 100, "2차 DL 분석이 완료되었습니다.", "2차 DL 분석")
             
@@ -1329,18 +1531,67 @@ def analyze(request):
             final_prediction = second_model_result['prediction']
             final_confidence = second_model_result['confidence']
             dl_jdgm_yn = 'Y'
+            
+            log_and_print("INFO", f"[DECISION] Final Decision: Adopting 2nd model result")
         else:
-            log_system_info("INFO", f"1차 모델에서 즉시 판별: {first_model_result['decision_type']}", audio_file.name, client_ip)
+            log_and_print("INFO", "[DECISION] Immediate classification by 1st model")
+            log_and_print("INFO", f"   Classification Type: {first_model_result.get('decision_type', 'Unknown')}")
+            log_and_print("INFO", f"   Skipping 2nd model analysis")
+            
+            log_system_info("INFO", f"1차 모델에서 즉시 판별: {first_model_result.get('decision_type', 'Unknown')}", audio_file.name, client_ip)
+            
+            log_and_print("INFO", f"[DECISION] Final Decision: Adopting 1st model result")
+        
+        # 최종 결과 요약
+        final_prediction_text = {
+            0: "Normal Call",
+            1: "Voice Phishing"
+        }.get(final_prediction, "Unknown")
+        
+        log_and_print("INFO", f"[SUMMARY] Final Analysis Result Summary")
+        log_and_print("INFO", f"   Final Prediction: {final_prediction} ({final_prediction_text})")
+        log_and_print("INFO", f"   Final Confidence: {final_confidence:.4f} ({final_confidence*100:.2f}%)")
+        log_and_print("INFO", f"   DL Model Used: {'Yes' if dl_jdgm_yn == 'Y' else 'No'}")
         
         # 7단계: LLM 설명 생성 (진행률 업데이트)
+        logger.info("="*80)
+        print_separator()
+        log_and_print("INFO", "[LLM] LLM Message Generation Stage Started")
+        logger.info(f"   ├─ LLM 모델: GPT-4")
+        logger.info(f"   ├─ 최종 예측: {final_prediction} ({final_prediction_text})")
+        logger.info(f"   ├─ 최종 신뢰도: {final_confidence:.4f}")
+        logger.info(f"   └─ 맞춤형 경고 메시지 생성")
+        
         send_progress_update(ocrn_no, 3, 0, "GPT-4가 맞춤형 경고 메시지를 생성하고 있습니다...", "LLM 메시지 생성")
         log_system_info("INFO", "LLM 설명 생성 시작", audio_file.name, client_ip)
+        
+        start_time = time.time()
         llm_result = generate_llm_explanation(transcript, first_model_result, second_model_result)
+        end_time = time.time()
+        
+        # LLM 결과 검증 및 로깅
+        phishing_type = llm_result.get('phishing_type', 'Unknown')
+        explanation = llm_result.get('explanation', '')
+        prevention_tips = llm_result.get('prevention_tips', [])
+        
+        log_and_print("INFO", f"[SUCCESS] LLM Message Generation Complete!")
+        logger.info(f"   ├─ 소요 시간: {end_time - start_time:.2f}초")
+        logger.info(f"   ├─ 보이스피싱 유형: {phishing_type}")
+        logger.info(f"   ├─ 설명 텍스트 길이: {len(explanation):,} 글자")
+        logger.info(f"   ├─ 예방 팁 개수: {len(prevention_tips)}개")
+        log_and_print("INFO", f"   Explanation Content (first 200 chars): {explanation[:200]}...")
+        
         log_system_info("INFO", f"LLM 설명 생성 완료: 유형={llm_result.get('phishing_type', 'Unknown')}", audio_file.name, client_ip)
         send_progress_update(ocrn_no, 3, 100, "LLM 메시지 생성이 완료되었습니다.", "LLM 메시지 생성")
         
         # 8단계: ModelRegistry 등록
+        logger.info("="*80)
+        print_separator()
+        log_and_print("INFO", "[DB REGISTRY] Database Integration Stage Started")
+        logger.info("   └─ ModelRegistry 테이블 업데이트")
+        
         # 1차 모델 등록
+        log_and_print("INFO", "[MODEL REG] Registering 1st model...")
         first_model_registry, created = ModelRegistry.objects.get_or_create(
             mdl_id='STACKING_V2',
             defaults={
@@ -1349,10 +1600,14 @@ def analyze(request):
             }
         )
         if created:
-            logger.info("1차 모델이 ModelRegistry에 등록됨")
+            log_and_print("INFO", "[SUCCESS] 1st model newly registered in ModelRegistry")
+            logger.info(f"   └─ 모델 ID: STACKING_V2")
+        else:
+            log_and_print("INFO", "[SUCCESS] 1st model confirmed in ModelRegistry (existing registration)")
         
         # 2차 모델 등록 (사용된 경우만)
         if dl_jdgm_yn == 'Y':
+            log_and_print("INFO", "[MODEL REG] Registering 2nd model...")
             second_model_registry, created = ModelRegistry.objects.get_or_create(
                 mdl_id='LGBM_V2',
                 defaults={
@@ -1361,13 +1616,29 @@ def analyze(request):
                 }
             )
             if created:
-                logger.info("2차 모델이 ModelRegistry에 등록됨")
+                log_and_print("INFO", "[SUCCESS] 2nd model newly registered in ModelRegistry")
+                logger.info(f"   └─ 모델 ID: LGBM_V2")
+            else:
+                log_and_print("INFO", "[SUCCESS] 2nd model confirmed in ModelRegistry (existing registration)")
+        else:
+            log_and_print("INFO", "[SKIP] Skipping 2nd model registration (not used)")
         
         # 9단계: 추론 결과 저장
+        print_separator()
+        log_and_print("INFO", "[INFERENCE] InferenceResult Table Save Started")
+        
         rslt_id = str(uuid.uuid4())
         
         # 최종 결과를 문자열로 변환 (데이터베이스 저장용)
         ml_result_code = str(final_prediction) if final_prediction != -1 else '보류'
+        
+        log_and_print("INFO", f"[DATA PREP] Preparing data to save...")
+        logger.info(f"   ├─ 결과 ID: {rslt_id}")
+        logger.info(f"   ├─ 모델 ID: {'LGBM_V2' if dl_jdgm_yn == 'Y' else 'STACKING_V2'}")
+        logger.info(f"   ├─ ML 결과 코드: {ml_result_code}")
+        logger.info(f"   ├─ 예측 점수: {final_confidence:.4f}")
+        logger.info(f"   ├─ DL 판단 여부: {dl_jdgm_yn}")
+        log_and_print("INFO", f"   Voice Phishing Type: {llm_result['phishing_type']}")
         
         # 필드 길이 안전장치 적용
         safe_rslt_id = safe_truncate_field(rslt_id, 50, "rslt_id")
@@ -1376,9 +1647,15 @@ def analyze(request):
         safe_ml_rslt_cd = safe_truncate_field(ml_result_code, 10, "ml_rslt_cd")
         safe_phsh_tp_nm = safe_truncate_field(llm_result['phishing_type'], 100, "phsh_tp_nm")
         
-        logger.info(f"InferenceResult 저장 데이터 길이 검증: rslt_id={len(safe_rslt_id)}, file_id={len(safe_file_id_value)}, mdl_id={len(safe_mdl_id)}")
+        log_and_print("INFO", f"[VALIDATION] Field Length Validation Complete")
+        logger.info(f"   ├─ rslt_id: {len(safe_rslt_id)}/50 글자")
+        logger.info(f"   ├─ file_id: {len(safe_file_id_value)}/20 글자")
+        logger.info(f"   ├─ mdl_id: {len(safe_mdl_id)}/20 글자")
+        logger.info(f"   ├─ ml_rslt_cd: {len(safe_ml_rslt_cd)}/10 글자")
+        logger.info(f"   └─ phsh_tp_nm: {len(safe_phsh_tp_nm)}/100 글자")
         
         try:
+            log_and_print("INFO", "[CREATE] Creating InferenceResult record...")
             inference_result = InferenceResult.objects.create(
                 rslt_id=safe_rslt_id,
                 ocrn_no=processed_file,
@@ -1391,7 +1668,9 @@ def analyze(request):
                 warn_cn=llm_result['warning'],  # TextField이므로 길이 제한 없음
                 prdt_dt=timezone.now()
             )
-            logger.info(f"InferenceResult 저장 성공: {safe_rslt_id}")
+            log_and_print("INFO", f"[SUCCESS] InferenceResult Save Complete!")
+            logger.info(f"   ├─ 레코드 ID: {inference_result.id}")
+            logger.info(f"   └─ 결과 ID: {safe_rslt_id}")
         except Exception as db_error:
             logger.error(f"InferenceResult 저장 실패: {str(db_error)}")
             logger.error(f"저장 시도 데이터: rslt_id={safe_rslt_id}, file_id={safe_file_id_value}")
@@ -1428,7 +1707,24 @@ def analyze(request):
                 raise Exception(f"추론 결과 저장 실패: {str(db_error)}")
         
         # 10단계: 기존 모델과 호환성을 위한 저장
+        logger.info("="*80)
+        print_separator()
+        log_and_print("INFO", "[ANALYSIS] AnalysisResult Table Save Started")
+        
         is_phishing = final_prediction == 1
+        total_processing_time = time.time() - start_time
+        
+        log_and_print("INFO", f"[DATA PREP] Preparing AnalysisResult data...")
+        logger.info(f"   ├─ 파일명: {file_name}")
+        logger.info(f"   ├─ 파일 크기: {audio_file.size:,} bytes")
+        logger.info(f"   ├─ 파일 타입: {audio_file.content_type}")
+        logger.info(f"   ├─ 보이스피싱 여부: {is_phishing}")
+        logger.info(f"   ├─ 신뢰도: {final_confidence:.4f}")
+        log_and_print("INFO", f"   Phishing Type: {llm_result['phishing_type']}")
+        logger.info(f"   ├─ 전체 처리 시간: {total_processing_time:.2f}초")
+        logger.info(f"   └─ 클라이언트 IP: {client_ip}")
+        
+        log_and_print("INFO", "[CREATE] Creating AnalysisResult record...")
         analysis_result = AnalysisResult.objects.create(
             file_name=file_name,  # 길이 제한된 파일명 사용
             file_size=audio_file.size,
@@ -1440,21 +1736,45 @@ def analyze(request):
             risk_factors=llm_result.get('risk_factors', ['기관명 언급', '계좌 관련 키워드'] if is_phishing else []),
             explanation=llm_result['explanation'],
             warning_message=llm_result['warning'],
-            processing_time=time.time() - start_time,
+            processing_time=total_processing_time,
             ip_address=client_ip
         )
         
+        log_and_print("INFO", f"[SUCCESS] AnalysisResult Save Complete!")
+        logger.info(f"   ├─ 레코드 ID: {analysis_result.id}")
+        logger.info(f"   └─ 생성 시간: {analysis_result.created_at}")
+        
         # 성공 로그
+        logger.info("="*80)
+        print_separator()
+        log_and_print("INFO", "[SYSLOG] SystemLog Table Final Log Save")
+        
         try:
+            log_and_print("INFO", "[CREATE] Creating analysis complete log...")
             success_log = SystemLog.objects.create(
                 level='INFO',
                 message=f'분석 완료: {audio_file.name} - {"피싱" if is_phishing else "정상"} (신뢰도: {final_confidence:.3f})',
                 file_name=audio_file.name,
                 ip_address=client_ip
             )
-            logger.info(f"분석 완료 로그 저장 성공: ID={success_log.id}")
+            log_and_print("INFO", f"[SUCCESS] Analysis complete log save successful!")
+            logger.info(f"   └─ 로그 ID: {success_log.id}")
         except Exception as log_error:
-            logger.error(f"분석 완료 로그 저장 실패: {str(log_error)}")
+            log_and_print("ERROR", f"[ERROR] Analysis complete log save failed: {str(log_error)}")
+        
+        # 최종 분석 완료 요약
+        logger.info("="*80)
+        print_separator()
+        log_and_print("INFO", "[COMPLETE] Analysis Complete - Overall Processing Summary")
+        logger.info(f"   ├─ 요청 ID: {ocrn_no}")
+        logger.info(f"   ├─ 파일명: {audio_file.name}")
+        logger.info(f"   ├─ 전체 처리 시간: {total_processing_time:.2f}초")
+        logger.info(f"   ├─ 최종 판정: {'보이스피싱' if is_phishing else '일반 통화'}")
+        logger.info(f"   ├─ 신뢰도: {final_confidence:.4f} ({final_confidence*100:.2f}%)")
+        logger.info(f"   ├─ 사용된 모델: {'1차+2차 모델' if dl_jdgm_yn == 'Y' else '1차 모델만'}")
+        logger.info(f"   ├─ 저장된 테이블: ProcessdFile, InferenceResult, AnalysisResult, SystemLog")
+        logger.info(f"   └─ 분석 결과 ID: {safe_rslt_id}")
+        logger.info("="*80)
         
         # 분석 결과 반환
         result = {
@@ -1575,44 +1895,68 @@ def submit_feedback(request):
             import re
             comment = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', comment)
         
-        logger.info(f"피드백 제출 요청: rslt_id={rslt_id}, ocrn_no={ocrn_no}, prediction={user_prediction}")
+        # 피드백 제출 시작 로깅
+        logger.info("="*80)
+        print_separator()
+        log_and_print("INFO", "[FEEDBACK] Feedback Submission Stage Started")
+        logger.info(f"   ├─ 결과 ID: {rslt_id}")
+        logger.info(f"   ├─ 요청 번호: {ocrn_no}")
+        logger.info(f"   ├─ 사용자 판단: {user_prediction}")
+        logger.info(f"   ├─ 코멘트 길이: {len(comment)} 글자")
+        logger.info(f"   └─ 클라이언트 IP: {client_ip}")
         
         # 필수 정보 검증
         if not rslt_id or not ocrn_no:
-            logger.warning(f"피드백 필수 정보 누락: rslt_id={rslt_id}, ocrn_no={ocrn_no}")
+            log_and_print("WARNING", "[ERROR] Required feedback information missing")
+            logger.warning(f"   ├─ rslt_id: {rslt_id}")
+            logger.warning(f"   └─ ocrn_no: {ocrn_no}")
             return JsonResponse({
                 'success': False,
                 'error': '분석 결과 정보가 누락되었습니다. 페이지를 새로고침 후 다시 시도해주세요.'
             }, status=400)
         
         # 분석 결과 존재 여부 확인 (더 유연한 검색)
+        log_and_print("INFO", "[SEARCH] Searching for analysis results...")
         try:
             # 먼저 rslt_id로 검색
+            logger.info(f"   └─ rslt_id로 검색: {rslt_id}")
             inference_result = InferenceResult.objects.filter(rslt_id=rslt_id).first()
             
             if not inference_result:
                 # rslt_id로 못 찾으면 ocrn_no로 검색
+                logger.info(f"   └─ ocrn_no로 검색: {ocrn_no}")
                 inference_result = InferenceResult.objects.filter(
                     ocrn_no__ocrn_no=ocrn_no
                 ).first()
             
             if not inference_result:
                 # 그래도 못 찾으면 file_id로 검색
+                logger.info(f"   └─ file_id로 검색: {ocrn_no}")
                 inference_result = InferenceResult.objects.filter(file_id=ocrn_no).first()
             
             if not inference_result:
-                logger.error(f"해당 분석 결과를 찾을 수 없음: rslt_id={rslt_id}, ocrn_no={ocrn_no}")
-                logger.info(f"저장된 InferenceResult 개수: {InferenceResult.objects.count()}")
+                log_and_print("ERROR", "[ERROR] Cannot find corresponding analysis result")
+                logger.error(f"   ├─ 검색한 rslt_id: {rslt_id}")
+                logger.error(f"   └─ 검색한 ocrn_no: {ocrn_no}")
+                
+                total_results = InferenceResult.objects.count()
+                logger.info(f"[INFO] 전체 InferenceResult 개수: {total_results}")
                 
                 # 최근 결과들 확인을 위한 로그
                 recent_results = InferenceResult.objects.order_by('-prdt_dt')[:5]
-                for result in recent_results:
-                    logger.info(f"최근 결과: rslt_id={result.rslt_id}, ocrn_no={result.ocrn_no.ocrn_no}, file_id={result.file_id}")
+                logger.info("[INFO] 최근 분석 결과 5개:")
+                for i, result in enumerate(recent_results, 1):
+                    logger.info(f"   {i}. rslt_id={result.rslt_id}, ocrn_no={result.ocrn_no.ocrn_no}, file_id={result.file_id}")
                 
                 return JsonResponse({
                     'success': False,
                     'error': '해당 분석 결과를 찾을 수 없습니다. 분석이 완료되지 않았거나 오류가 발생했을 수 있습니다.'
                 }, status=404)
+            else:
+                log_and_print("INFO", "[SUCCESS] Analysis result search successful")
+                logger.info(f"   ├─ 발견된 결과 ID: {inference_result.id}")
+                logger.info(f"   ├─ rslt_id: {inference_result.rslt_id}")
+                logger.info(f"   └─ 예측 점수: {inference_result.prdt_scr:.4f}")
                 
         except Exception as db_error:
             logger.error(f"분석 결과 검색 중 데이터베이스 오류: {str(db_error)}")
@@ -1632,13 +1976,18 @@ def submit_feedback(request):
             logger.info(f"코멘트 길이 제한으로 자름: {len(data.get('comment', ''))} -> 1000")
         
         # 중복 피드백 확인 (선택적 - 같은 결과에 대한 중복 피드백 방지)
+        log_and_print("INFO", "[CHECK] Checking for duplicate feedback...")
         existing_feedback = Feedback.objects.filter(
             rslt_id=rslt_id,
             ocrn_no=ocrn_no
         ).first()
         
         if existing_feedback:
-            logger.info(f"기존 피드백 업데이트: {existing_feedback.prp_no}")
+            log_and_print("INFO", "[UPDATE] Existing feedback update mode")
+            logger.info(f"   ├─ 기존 피드백 ID: {existing_feedback.prp_no}")
+            logger.info(f"   ├─ 기존 사용자 판단: {existing_feedback.prdt_rslt_yn}")
+            logger.info(f"   └─ 새로운 사용자 판단: {user_prediction}")
+            
             # 기존 피드백 업데이트
             existing_feedback.prdt_rslt_yn = user_prediction
             existing_feedback.wropn_cn = comment
@@ -1647,9 +1996,18 @@ def submit_feedback(request):
             
             feedback_id = existing_feedback.prp_no
             message = '피드백이 성공적으로 업데이트되었습니다.'
+            
+            log_and_print("INFO", "[SUCCESS] Existing feedback update complete")
+            logger.info(f"   └─ 업데이트된 피드백 ID: {feedback_id}")
         else:
+            log_and_print("INFO", "[CREATE] New feedback creation mode")
+            
             # 새로운 피드백 생성 (prp_no는 20자 제한이므로 짧은 ID 사용)
             prp_no = generate_short_id()  # 기존 함수 재사용
+            logger.info(f"   ├─ 생성할 피드백 ID: {prp_no}")
+            logger.info(f"   ├─ 사용자 판단: {user_prediction}")
+            logger.info(f"   └─ 코멘트 길이: {len(comment)} 글자")
+            
             feedback = Feedback.objects.create(
                 prp_no=prp_no,
                 rslt_id=rslt_id,
@@ -1661,18 +2019,36 @@ def submit_feedback(request):
             
             feedback_id = prp_no
             message = '피드백이 성공적으로 제출되었습니다.'
+            
+            log_and_print("INFO", "[SUCCESS] New feedback creation complete")
+            logger.info(f"   ├─ 생성된 피드백 레코드 ID: {feedback.id}")
+            logger.info(f"   └─ 피드백 ID: {feedback_id}")
+            
             log_system_info("INFO", f"새 피드백 생성: {prp_no} - 사용자 판단: {user_prediction}", inference_result.ocrn_no.trsc_file_nm if inference_result.ocrn_no else "UNKNOWN", client_ip)
         
         # 시스템 로그 기록
+        log_and_print("INFO", "[SYSLOG] Saving feedback complete log to SystemLog table...")
         try:
-            SystemLog.objects.create(
+            system_log = SystemLog.objects.create(
                 level='INFO',
                 message=f'피드백 제출 완료: {feedback_id} - 사용자 판단: {user_prediction}',
                 file_name=inference_result.ocrn_no.trsc_file_nm,
                 ip_address=client_ip
             )
+            log_and_print("INFO", f"[SUCCESS] SystemLog save successful (ID: {system_log.id})")
         except Exception as log_error:
-            logger.error(f"피드백 시스템 로그 기록 실패: {str(log_error)}")
+            logger.error(f"[ERROR] 피드백 SystemLog 기록 실패: {str(log_error)}")
+        
+        # 피드백 제출 완료 요약
+        logger.info("="*80)
+        print_separator()
+        log_and_print("INFO", "[COMPLETE] Feedback Submission Complete - Summary")
+        logger.info(f"   ├─ 피드백 ID: {feedback_id}")
+        logger.info(f"   ├─ 처리 방식: {'업데이트' if existing_feedback else '신규 생성'}")
+        logger.info(f"   ├─ 사용자 판단: {user_prediction} ({'보이스피싱' if user_prediction == 'Y' else '일반통화'})")
+        logger.info(f"   ├─ 코멘트: {'있음' if comment else '없음'}")
+        logger.info(f"   └─ 메시지: {message}")
+        logger.info("="*80)
         
         return JsonResponse({
             'success': True,

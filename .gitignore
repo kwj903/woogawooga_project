@@ -34,4 +34,9 @@ local_settings.py
 .DS_store
 *.bak
 *.swp
+# 제외할 폴더
+logs/*
+!logs/.gitkeep
+media/*
+!media/.gitkeep
 

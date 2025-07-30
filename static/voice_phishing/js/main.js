@@ -230,8 +230,43 @@ class VoicePhishingDetector {
     }
   }
 
+  // 프론트엔드 로깅 헬퍼 함수
+  async logAnalysisEvent(level, message, eventType) {
+    try {
+      const logData = {
+        level: level,
+        message: message,
+        file_name: eventType || 'FRONTEND',
+        ip_address: 'CLIENT',
+        task_id: this.taskId || 'unknown'
+      }
+      
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+      if (!csrfToken) {
+        console.warn('CSRF 토큰을 찾을 수 없어 로그 전송을 건너뜁니다.')
+        return
+      }
+      
+      await fetch('/log_frontend_event/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(logData)
+      })
+      
+      console.log(`[FRONTEND_LOG] ${level}: ${message}`)
+    } catch (error) {
+      console.error('프론트엔드 로그 전송 실패:', error)
+    }
+  }
+
   async startSimulatedAnalysis() {
     console.log('시뮬레이션 기반 분석 시작')
+    
+    // 시뮬레이션 시작 로그 전송
+    this.logAnalysisEvent('INFO', '시뮬레이션 기반 분석 시작', 'SIMULATION_START')
     
     // 분석 단계 데이터
     const analysisSteps = [
@@ -271,6 +306,7 @@ class VoicePhishingDetector {
       
       // 현재 단계 시작
       console.log(`단계 ${i + 1}: ${step.title} 시작`)
+      await this.logAnalysisEvent('INFO', `단계 ${i + 1}: ${step.title} 시작`, `STEP_${step.id.toUpperCase()}_START`)
       this.setCurrentStep(step.id, step.message)
       
       // 진행률 애니메이션 (0% -> 100%)
@@ -284,6 +320,7 @@ class VoicePhishingDetector {
       this.updateTotalProgress(totalProgress)
       
       console.log(`단계 ${i + 1}: ${step.title} 완료 (${totalProgress}%)`)
+      await this.logAnalysisEvent('INFO', `단계 ${i + 1}: ${step.title} 완료 (${totalProgress}%)`, `STEP_${step.id.toUpperCase()}_COMPLETE`)
       
       // 다음 단계로 넘어가기 전 잠시 대기
       if (i < analysisSteps.length - 1) {
@@ -293,6 +330,7 @@ class VoicePhishingDetector {
 
     // 모든 분석 완룼
     console.log('모든 분석 단계 완료')
+    await this.logAnalysisEvent('INFO', '모든 분석 단계 완료 - 결과 준비 중', 'SIMULATION_COMPLETE')
     this.showAnalysisCompleted()
     
     // 2초 후 결과 화면으로 전환

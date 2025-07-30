@@ -17,6 +17,9 @@ urlpatterns = [
     # 피드백 API
     path('submit_feedback/', views.submit_feedback, name='submit_feedback'),
     
+    # 프론트엔드 로깅 API
+    path('log_frontend_event/', views.log_frontend_event, name='log_frontend_event'),
+    
     # 분석 이력 API
     path('history/', views.get_analysis_history, name='analysis_history'),
     
