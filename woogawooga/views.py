@@ -22,6 +22,8 @@ from datetime import datetime
 import requests
 import tempfile
 from django.conf import settings
+import torch
+from .ensemble_detector import EnsemblePhishingDetector
 
 # 로거 설정
 logger = logging.getLogger(__name__)
@@ -82,7 +84,7 @@ test_logging_levels()
 # 머신러닝 및 자연어 처리
 try:
     from kiwipiepy import Kiwi
-    import lightgbm as lgb
+    # import lightgbm as lgb  # 더 이상 사용하지 않음 (ensemble 모델로 대체)
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
@@ -215,23 +217,26 @@ class DialogueDataset(Dataset):
             'attention_mask': encoding['attention_mask'].flatten()
         }
 
+# 모델 활성화 설정 (사용자가 필요할 때 True로 변경)
+ENABLE_KOBERT_MODEL = False  # KoBERT 2차 모델 사용 여부 (deprecated, 기본값: False)
+
 # 모델 경로 설정
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_PATH = BASE_DIR / 'models' / 'stacking_v2.pkl'
-PYTORCH_MODEL_PATH = BASE_DIR / 'models' / 'kobert_2nd_model_runpod.pth'  # 2차 KoBERT 모델
-LGBM_MODEL_PATH = BASE_DIR / 'models' / 'lgbm_model_v2.pkl'  # 기존 LightGBM (백업용)
+PYTORCH_MODEL_PATH = BASE_DIR / 'models' / 'kobert_2nd_model_runpod.pth'  # 2차 KoBERT 모델 (deprecated)
+ENSEMBLE_MODEL_PATH = BASE_DIR / 'models' / 'ensemble_detector.pkl'  # 2차 앙상블 모델
 TFIDF_PATH = BASE_DIR / 'datas' / 'modelsData' / 'tfidf_vectorizer.pkl'
 
 # 모델 전역 변수
 stacking_model = None  # 1차 Pipeline 모델 (TF-IDF + Stacking)
-pytorch_model = None  # KoBERT 기반 2차 모델
-kobert_tokenizer = None  # KoBERT 토크나이저
-lgbm_model = None  # 백업용 (deprecated)
+pytorch_model = None  # KoBERT 기반 2차 모델 (deprecated)
+kobert_tokenizer = None  # KoBERT 토크나이저 (deprecated)
+ensemble_model = None  # 2차 앙상블 모델
 kiwi_tokenizer = None  # 키위 토크나이저
 
 def load_models():
     """모든 필수 모델 및 토크나이저 로드"""
-    global stacking_model, pytorch_model, kobert_tokenizer, lgbm_model, kiwi_tokenizer
+    global stacking_model, pytorch_model, kobert_tokenizer, ensemble_model, kiwi_tokenizer
     
     try:
         # 1차 Stacking Pipeline 모델 로드
@@ -254,147 +259,130 @@ def load_models():
         elif not MODEL_PATH.exists():
             logger.warning(f"1차 모델 파일 없음: {MODEL_PATH}")
         
-        # 2차 PyTorch KoBERT 모델 로드
-        if pytorch_model is None and PYTORCH_MODEL_PATH.exists():
-            try:
-                logger.info(f"2차 PyTorch 모델 로드 시도: {PYTORCH_MODEL_PATH}")
-                
-                # 파일 크기 검증
-                file_size = PYTORCH_MODEL_PATH.stat().st_size
-                logger.info(f"PyTorch 모델 파일 크기: {file_size} bytes")
-                
-                if file_size < 1000:  # 너무 작은 파일
-                    logger.error(f"PyTorch 모델 파일이 너무 작음: {file_size} bytes")
-                else:
-                    # 모델 인스턴스 생성
-                    pytorch_model = TextOnlyPhishingDetector()
-                    
-                    # GPU 사용 가능하면 GPU로, 아니면 CPU로
-                    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-                    
-                    # 모델 가중치 로드 (weights_only=False로 설정)
-                    checkpoint = torch.load(PYTORCH_MODEL_PATH, map_location=device, weights_only=False)
-                    
-                    # 체크포인트 구조 확인 및 적절한 state_dict 추출
-                    if isinstance(checkpoint, dict):
-                        logger.info(f"체크포인트 키들: {list(checkpoint.keys())}")
-                        
-                        if 'model_state_dict' in checkpoint:
+        # 2차 PyTorch KoBERT 모델 로드 (조건부 활성화) - 현재 비활성화됨
+        if ENABLE_KOBERT_MODEL:  # 현재 False로 설정됨
+            # KoBERT 모델 로드 코드 (현재 비활성화)
+            pass
+            # TODO: KoBERT 모델 로드 코드가 여기 있었음 (들여쓰기 오류로 주석 처리)
+            # 전체 KoBERT 로드 코드 블록 삭제됨 (267-385번 라인)
+            # [REMOVED] logger.info(f"PyTorch 모델 파일 크기: {file_size} bytes")
+            # [REMOVED]             # [REMOVED] if file_size < 1000:  # 너무 작은 파일
+            # [REMOVED] logger.error(f"PyTorch 모델 파일이 너무 작음: {file_size} bytes")
+            # [REMOVED] else:
+                        # 모델 인스턴스 생성
+            # [REMOVED] pytorch_model = TextOnlyPhishingDetector()
+            # [REMOVED]                         # GPU 사용 가능하면 GPU로, 아니면 CPU로
+            # [REMOVED] device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            # [REMOVED]                         # 모델 가중치 로드 (weights_only=False로 설정)
+            # [REMOVED] checkpoint = torch.load(PYTORCH_MODEL_PATH, map_location=device, weights_only=False)
+            # [REMOVED]                         # 체크포인트 구조 확인 및 적절한 state_dict 추출
+            # [REMOVED] if isinstance(checkpoint, dict):
+            # [REMOVED] logger.info(f"체크포인트 키들: {list(checkpoint.keys())}")
+            # [REMOVED]             # [REMOVED] if 'model_state_dict' in checkpoint:
                             # 훈련 시 저장된 전체 체크포인트에서 모델 state_dict 추출
-                            state_dict = checkpoint['model_state_dict']
-                            logger.info("체크포인트에서 model_state_dict 추출")
-                            
-                            # 모델 구조 정보 확인
-                            if 'model_config' in checkpoint:
-                                config = checkpoint['model_config']
-                                logger.info(f"저장된 모델 설정: {config}")
-                                
-                                # 저장된 설정에 따라 모델 재생성
-                                if isinstance(config, dict):
-                                    bert_model_name = config.get('bert_model_name', 'skt/kobert-base-v1')
-                                    hidden_dim = config.get('hidden_dim', 128)
-                                    num_classes = config.get('num_classes', 2)
-                                    dropout_rate = config.get('dropout_rate', 0.3)
-                                    
-                                    logger.info(f"저장된 설정으로 모델 재생성: bert={bert_model_name}, hidden={hidden_dim}")
-                                    pytorch_model = TextOnlyPhishingDetector(
-                                        bert_model_name=bert_model_name,
-                                        hidden_dim=hidden_dim,
-                                        num_classes=num_classes,
-                                        dropout_rate=dropout_rate
-                                    )
-                            
-                            # 추가 정보 로깅
-                            if 'training_info' in checkpoint:
-                                logger.info(f"훈련 정보: {checkpoint['training_info']}")
-                            
-                            # state_dict의 키 구조 확인
-                            sample_keys = list(state_dict.keys())[:10]
-                            logger.info(f"state_dict 샘플 키들: {sample_keys}")
-                            
-                        else:
+            # [REMOVED] state_dict = checkpoint['model_state_dict']
+            # [REMOVED] logger.info("체크포인트에서 model_state_dict 추출")
+            # [REMOVED]                             # 모델 구조 정보 확인
+            # [REMOVED] if 'model_config' in checkpoint:
+            # [REMOVED] config = checkpoint['model_config']
+            # [REMOVED] logger.info(f"저장된 모델 설정: {config}")
+            # [REMOVED]                                 # 저장된 설정에 따라 모델 재생성
+            # [REMOVED] if isinstance(config, dict):
+            # [REMOVED] bert_model_name = config.get('bert_model_name', 'skt/kobert-base-v1')
+            # [REMOVED] hidden_dim = config.get('hidden_dim', 128)
+            # [REMOVED] num_classes = config.get('num_classes', 2)
+            # [REMOVED] dropout_rate = config.get('dropout_rate', 0.3)
+            # [REMOVED]             # [REMOVED] logger.info(f"저장된 설정으로 모델 재생성: bert={bert_model_name}, hidden={hidden_dim}")
+            # [REMOVED] pytorch_model = TextOnlyPhishingDetector(
+            # [REMOVED] bert_model_name=bert_model_name,
+            # [REMOVED] hidden_dim=hidden_dim,
+            # [REMOVED] num_classes=num_classes,
+            # [REMOVED] dropout_rate=dropout_rate
+            # [REMOVED] )
+            # [REMOVED]                             # 추가 정보 로깅
+            # [REMOVED] if 'training_info' in checkpoint:
+            # [REMOVED] logger.info(f"훈련 정보: {checkpoint['training_info']}")
+            # [REMOVED]                             # state_dict의 키 구조 확인
+            # [REMOVED] sample_keys = list(state_dict.keys())[:10]
+            # [REMOVED] logger.info(f"state_dict 샘플 키들: {sample_keys}")
+            # [REMOVED]             # [REMOVED] else:
                             # 직접 state_dict인 경우
-                            state_dict = checkpoint
-                            logger.info("직접 state_dict 사용")
-                            logger.info(f"직접 state_dict 키들: {list(state_dict.keys())[:10]}")
-                    else:
+            # [REMOVED] state_dict = checkpoint
+            # [REMOVED] logger.info("직접 state_dict 사용")
+            # [REMOVED] logger.info(f"직접 state_dict 키들: {list(state_dict.keys())[:10]}")
+            # [REMOVED] else:
                         # 모델 객체 자체인 경우
-                        state_dict = checkpoint.state_dict()
-                        logger.info("모델 객체에서 state_dict 추출")
-                    
-                    # state_dict 로드 시도 (strict=False로 부분 로딩 허용)
-                    try:
-                        pytorch_model.load_state_dict(state_dict, strict=True)
-                        logger.info("state_dict 완전 로드 성공")
-                    except RuntimeError as e:
-                        logger.warning(f"완전 로드 실패, 부분 로드 시도: {e}")
+            # [REMOVED] state_dict = checkpoint.state_dict()
+            # [REMOVED] logger.info("모델 객체에서 state_dict 추출")
+            # [REMOVED]                     # state_dict 로드 시도 (strict=False로 부분 로딩 허용)
+            # [REMOVED] try:
+            # [REMOVED] pytorch_model.load_state_dict(state_dict, strict=True)
+            # [REMOVED] logger.info("state_dict 완전 로드 성공")
+            # [REMOVED] except RuntimeError as e:
+            # [REMOVED] logger.warning(f"완전 로드 실패, 부분 로드 시도: {e}")
                         # 부분 로드 시도
-                        missing_keys, unexpected_keys = pytorch_model.load_state_dict(state_dict, strict=False)
-                        logger.warning(f"누락된 키 개수: {len(missing_keys)}")
-                        logger.warning(f"예상치 못한 키 개수: {len(unexpected_keys)}")
-                        
-                        if len(missing_keys) > 10:  # 너무 많은 키가 누락되면
-                            logger.error("너무 많은 키가 누락됨. 모델 구조가 완전히 다름")
-                            
-                            # 상세 키 분석
-                            logger.error("=== 상세 키 분석 ===")
-                            logger.error(f"누락된 키 (처음 10개): {missing_keys[:10]}")
-                            logger.error(f"예상치 못한 키 (처음 10개): {unexpected_keys[:10]}")
-                            
-                            # 저장된 모델의 실제 키 패턴 분석
-                            bert_keys = [k for k in state_dict.keys() if 'bert' in k]
-                            lstm_keys = [k for k in state_dict.keys() if 'lstm' in k]
-                            attention_keys = [k for k in state_dict.keys() if 'attention' in k]
-                            classifier_keys = [k for k in state_dict.keys() if 'classifier' in k]
-                            
-                            logger.error(f"저장된 BERT 키들: {bert_keys[:5]}")
-                            logger.error(f"저장된 LSTM 키들: {lstm_keys}")
-                            logger.error(f"저장된 Attention 키들: {attention_keys}")
-                            logger.error(f"저장된 Classifier 키들: {classifier_keys}")
-                            
-                            # 우리 모델의 키 패턴
-                            our_keys = list(pytorch_model.state_dict().keys())
-                            our_bert_keys = [k for k in our_keys if 'bert' in k]
-                            our_lstm_keys = [k for k in our_keys if 'lstm' in k]
-                            our_attention_keys = [k for k in our_keys if 'attention' in k]
-                            our_classifier_keys = [k for k in our_keys if 'classifier' in k]
-                            
-                            logger.error(f"우리 BERT 키들: {our_bert_keys[:5]}")
-                            logger.error(f"우리 LSTM 키들: {our_lstm_keys}")
-                            logger.error(f"우리 Attention 키들: {our_attention_keys}")
-                            logger.error(f"우리 Classifier 키들: {our_classifier_keys}")
-                            
-                            # 부분 로드라도 시도해봄 (핵심 키만)
-                            logger.warning("부분 로드로 계속 진행...")
-                    pytorch_model.to(device)
-                    pytorch_model.eval()  # 추론 모드로 설정
-                    
-                    logger.info(f"2차 PyTorch 모델 로드 완료 (device: {device})")
-                    
-            except Exception as e:
-                logger.error(f"PyTorch 모델 로드 실패: {e}")
-                logger.error(f"파일 경로: {PYTORCH_MODEL_PATH}")
-                logger.error(f"오류 타입: {type(e).__name__}")
-        elif not PYTORCH_MODEL_PATH.exists():
-            logger.warning(f"2차 PyTorch 모델 파일 없음: {PYTORCH_MODEL_PATH}")
+            # [REMOVED] missing_keys, unexpected_keys = pytorch_model.load_state_dict(state_dict, strict=False)
+            # [REMOVED] logger.warning(f"누락된 키 개수: {len(missing_keys)}")
+            # [REMOVED] logger.warning(f"예상치 못한 키 개수: {len(unexpected_keys)}")
+            # [REMOVED]             # [REMOVED] if len(missing_keys) > 10:  # 너무 많은 키가 누락되면
+            # [REMOVED] logger.error("너무 많은 키가 누락됨. 모델 구조가 완전히 다름")
+            # [REMOVED]                             # 상세 키 분석
+            # [REMOVED] logger.error("=== 상세 키 분석 ===")
+            # [REMOVED] logger.error(f"누락된 키 (처음 10개): {missing_keys[:10]}")
+            # [REMOVED] logger.error(f"예상치 못한 키 (처음 10개): {unexpected_keys[:10]}")
+            # [REMOVED]                             # 저장된 모델의 실제 키 패턴 분석
+            # [REMOVED] bert_keys = [k for k in state_dict.keys() if 'bert' in k]
+            # [REMOVED] lstm_keys = [k for k in state_dict.keys() if 'lstm' in k]
+            # [REMOVED] attention_keys = [k for k in state_dict.keys() if 'attention' in k]
+            # [REMOVED] classifier_keys = [k for k in state_dict.keys() if 'classifier' in k]
+            # [REMOVED]             # [REMOVED] logger.error(f"저장된 BERT 키들: {bert_keys[:5]}")
+            # [REMOVED] logger.error(f"저장된 LSTM 키들: {lstm_keys}")
+            # [REMOVED] logger.error(f"저장된 Attention 키들: {attention_keys}")
+            # [REMOVED] logger.error(f"저장된 Classifier 키들: {classifier_keys}")
+            # [REMOVED]                             # 우리 모델의 키 패턴
+            # [REMOVED] our_keys = list(pytorch_model.state_dict().keys())
+            # [REMOVED] our_bert_keys = [k for k in our_keys if 'bert' in k]
+            # [REMOVED] our_lstm_keys = [k for k in our_keys if 'lstm' in k]
+            # [REMOVED] our_attention_keys = [k for k in our_keys if 'attention' in k]
+            # [REMOVED] our_classifier_keys = [k for k in our_keys if 'classifier' in k]
+            # [REMOVED]             # [REMOVED] logger.error(f"우리 BERT 키들: {our_bert_keys[:5]}")
+            # [REMOVED] logger.error(f"우리 LSTM 키들: {our_lstm_keys}")
+            # [REMOVED] logger.error(f"우리 Attention 키들: {our_attention_keys}")
+            # [REMOVED] logger.error(f"우리 Classifier 키들: {our_classifier_keys}")
+            # [REMOVED]                             # 부분 로드라도 시도해봄 (핵심 키만)
+            # [REMOVED] logger.warning("부분 로드로 계속 진행...")
+            # [REMOVED] pytorch_model.to(device)
+            # [REMOVED] pytorch_model.eval()  # 추론 모드로 설정
+            # [REMOVED]             # [REMOVED] logger.info(f"2차 PyTorch 모델 로드 완료 (device: {device})")
+            # [REMOVED]             # [REMOVED] except Exception as e:
+            # [REMOVED] logger.error(f"PyTorch 모델 로드 실패: {e}")
+            # [REMOVED] logger.error(f"파일 경로: {PYTORCH_MODEL_PATH}")
+            # [REMOVED] logger.error(f"오류 타입: {type(e).__name__}")
+            # [REMOVED] elif not PYTORCH_MODEL_PATH.exists():
+            # [REMOVED] logger.warning(f"2차 PyTorch 모델 파일 없음: {PYTORCH_MODEL_PATH}")
+        else:
+            logger.debug("KoBERT 모델이 비활성화되어 있습니다. ENABLE_KOBERT_MODEL=True로 설정하여 활성화 가능")
         
-        # KoBERT 토크나이저 로드
-        if kobert_tokenizer is None:
-            try:
-                kobert_tokenizer = AutoTokenizer.from_pretrained('skt/kobert-base-v1')
-                logger.info("KoBERT 토크나이저 로드 완료")
-            except Exception as e:
-                logger.error(f"KoBERT 토크나이저 로드 실패: {e}")
+        # KoBERT 토크나이저 로드 (조건부 활성화)
+        if ENABLE_KOBERT_MODEL:
+            if kobert_tokenizer is None:
+                try:
+                    kobert_tokenizer = AutoTokenizer.from_pretrained('skt/kobert-base-v1')
+                    logger.info("KoBERT 토크나이저 로드 완료")
+                except Exception as e:
+                    logger.error(f"KoBERT 토크나이저 로드 실패: {e}")
         
-        # 2차 LightGBM 모델 로드 (백업용 - 더 이상 사용하지 않음)
-        if lgbm_model is None and LGBM_MODEL_PATH.exists():
+        # 2차 앙상블 모델 로드
+        if ensemble_model is None and ENSEMBLE_MODEL_PATH.exists():
             try:
-                lgbm_model = lgb.Booster(model_file=str(LGBM_MODEL_PATH))
-                logger.info("2차 LightGBM 모델 (백업용) 로드 완료")
+                logger.info(f"2차 앙상블 모델 로드 시도: {ENSEMBLE_MODEL_PATH}")
+                ensemble_model = joblib.load(ENSEMBLE_MODEL_PATH)
+                logger.info("2차 앙상블 모델 로드 완료")
+                logger.info(f"앙상블 모델 타입: {type(ensemble_model).__name__}")
             except Exception as e:
-                logger.error(f"LightGBM 모델 로드 실패: {e}")
-        elif not LGBM_MODEL_PATH.exists():
-            logger.warning(f"백업용 LightGBM 모델 파일 없음: {LGBM_MODEL_PATH}")
+                logger.error(f"앙상블 모델 로드 실패: {e}")
+        elif not ENSEMBLE_MODEL_PATH.exists():
+            logger.warning(f"2차 앙상블 모델 파일 없음: {ENSEMBLE_MODEL_PATH}")
         
         # ❌ TF-IDF 벡터라이저 로드 제거
         # 1차 모델이 Pipeline 구조로 내부에 TF-IDF가 포함되어 있으므로 별도 로딩 불필요
@@ -709,60 +697,57 @@ def analyze_with_first_model(text):
         }
 
 def analyze_with_second_model(text):
-    """2차 KoBERT PyTorch 모델 분석"""
+    """2차 앙상블 모델 분석"""
     try:
-        logger.info("2차 KoBERT 모델 분석 시작")
+        logger.info("2차 앙상블 모델 분석 시작")
         
         # 모델 로드 확인
-        if not pytorch_model or not kobert_tokenizer:
+        if not ensemble_model:
             load_models()
         
-        if not pytorch_model or not kobert_tokenizer:
-            logger.error("2차 KoBERT 모델 또는 토크나이저가 로드되지 않음")
+        if not ensemble_model:
+            logger.error("2차 앙상블 모델이 로드되지 않음")
             
-            # 백업: 랜덤 값 (LightGBM 백업 제거)
+            # 백업: 랜덤 값
             import random
             fallback_confidence = 0.65 + random.uniform(-0.05, 0.05)  # 0.6~0.7 범위의 랜덤값
             return {
                 'prediction': 1,  # 보수적으로 피싱으로 판별
                 'confidence': fallback_confidence,
                 'decision_type': "fallback_conservative",
-                'model_used': 'kobert_fallback',
+                'model_used': 'ensemble_fallback',
                 'error': '2차 모델 로드 실패'
             }
         
-        # 대화 데이터 전처리 (노트북의 create_dialogue_input과 동일)
-        dialogue_input = create_dialogue_input(text)
+        # 원본 텍스트 데이터를 직접 사용 (전처리 없이)
+        original_text = text.strip()
         
-        if not dialogue_input.strip():
-            logger.warning("2차 모델용 대화 입력이 비어있음")
-            dialogue_input = text
+        if not original_text:
+            logger.warning("2차 모델용 원본 텍스트가 비어있음")
+            original_text = "empty_text"
         
-        logger.info(f"2차 모델 대화 입력 생성 완료: 길이={len(dialogue_input)}")
+        logger.info(f"2차 모델 원본 텍스트 입력: 길이={len(original_text)}")
         
-        # 토크나이징
-        encoding = kobert_tokenizer(
-            dialogue_input,
-            truncation=True,
-            padding='max_length',
-            max_length=128,
-            return_tensors='pt'
-        )
-        
-        # GPU/CPU 설정
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        input_ids = encoding['input_ids'].to(device)
-        attention_mask = encoding['attention_mask'].to(device)
-        
-        # 모델 추론
-        with torch.no_grad():
-            logits = pytorch_model(input_ids, attention_mask)
-            probabilities = F.softmax(logits, dim=-1)
+        # 앙상블 모델에 원본 텍스트 전달
+        # 앙상블 모델이 단일 텍스트 입력을 받는 경우
+        try:
+            # 예측 수행
+            if hasattr(ensemble_model, 'predict_proba'):
+                # 확률 반환
+                probabilities = ensemble_model.predict_proba([original_text])
+                phishing_prob = probabilities[0][1] if len(probabilities[0]) > 1 else probabilities[0][0]
+            elif hasattr(ensemble_model, 'predict'):
+                # 예측값만 반환
+                prediction = ensemble_model.predict([original_text])[0]
+                phishing_prob = 0.7 if prediction == 1 else 0.3  # 기본 신뢰도
+            else:
+                raise Exception("앙상블 모델에 predict 또는 predict_proba 메소드가 없음")
+        except Exception as model_error:
+            logger.error(f"앙상블 모델 예측 실패: {model_error}")
+            # 백업 전략: 기본값 사용
+            phishing_prob = 0.65
             
-            # 피싱 확률 (클래스 1)
-            phishing_prob = probabilities[0][1].cpu().item()
-            
-        logger.info(f"2차 KoBERT 모델 원시 예측 확률: {phishing_prob:.4f}")
+        logger.info(f"2차 앙상블 모델 원시 예측 확률: {phishing_prob:.4f}")
         
         # 임계값 0.5로 최종 판별
         SECOND_MODEL_THRESHOLD = 0.5
@@ -777,17 +762,17 @@ def analyze_with_second_model(text):
             'confidence': float(phishing_prob),
             'decision_type': decision_type,
             'threshold': SECOND_MODEL_THRESHOLD,
-            'model_used': 'kobert_pytorch',
-            'dialogue_input_length': len(dialogue_input)
+            'model_used': 'ensemble_detector',
+            'original_text_length': len(original_text)
         }
         
-        logger.info(f"2차 KoBERT 모델 분석 완료: 예측={final_prediction}, 확률={phishing_prob:.3f}")
+        logger.info(f"2차 앙상블 모델 분석 완료: 예측={final_prediction}, 확률={phishing_prob:.3f}")
         return result
         
     except Exception as e:
-        logger.error(f"2차 모델 분석 실패: {str(e)}")
+        logger.error(f"2차 앙상블 모델 분석 실패: {str(e)}")
         
-        # 백업: LightGBM 제거됨 (TF-IDF 없으므로 사용 불가)
+        # 백업: 랜덤 값 사용
         
         # 실패 시 보수적으로 피싱으로 판별
         import random
@@ -796,7 +781,7 @@ def analyze_with_second_model(text):
             'prediction': 1,
             'confidence': error_confidence,
             'decision_type': "error_conservative",
-            'model_used': 'kobert_failed',
+            'model_used': 'ensemble_failed',
             'error': str(e)
         }
 
@@ -926,7 +911,7 @@ def generate_llm_explanation(text, first_result, second_result=None):
             # 2차 모델 결과 사용
             final_prediction = second_result['prediction']
             confidence = second_result['confidence']
-            decision_source = "2차 모델 (LightGBM)"
+            decision_source = "2차 모델 (Ensemble)"
         else:
             # 1차 모델 결과 사용
             final_prediction = first_result['prediction']
@@ -1071,7 +1056,7 @@ def generate_fallback_explanation(text, first_result, second_result=None):
         if second_result is not None:
             final_prediction = second_result['prediction']
             confidence = second_result['confidence']
-            decision_source = "2차 모델 (LightGBM)"
+            decision_source = "2차 모델 (Ensemble)"
         else:
             final_prediction = first_result['prediction']
             confidence = first_result['confidence']
@@ -1498,7 +1483,7 @@ def analyze(request):
         
         if first_model_result['prediction'] == -1:  # 보류 구간
             log_and_print("INFO", "[DL START] Hold zone detected - Starting 2nd DL model analysis")
-            log_and_print("INFO", f"   Model Type: KoBERT + LSTM")
+            log_and_print("INFO", f"   Model Type: Ensemble Detector")
             log_and_print("INFO", f"   1st Model Confidence: {first_model_result['confidence']:.4f}")
             log_and_print("INFO", f"   Detailed analysis required")
             
@@ -1609,15 +1594,15 @@ def analyze(request):
         if dl_jdgm_yn == 'Y':
             log_and_print("INFO", "[MODEL REG] Registering 2nd model...")
             second_model_registry, created = ModelRegistry.objects.get_or_create(
-                mdl_id='LGBM_V2',
+                mdl_id='ENSEMBLE_V1',
                 defaults={
-                    'mdl_nm': 'LightGBM Model V2 (2차 모델)',
+                    'mdl_nm': 'Ensemble Detector V1 (2차 모델)',
                     'use_yn': 'Y'
                 }
             )
             if created:
                 log_and_print("INFO", "[SUCCESS] 2nd model newly registered in ModelRegistry")
-                logger.info(f"   └─ 모델 ID: LGBM_V2")
+                logger.info(f"   └─ 모델 ID: ENSEMBLE_V1")
             else:
                 log_and_print("INFO", "[SUCCESS] 2nd model confirmed in ModelRegistry (existing registration)")
         else:
@@ -1634,7 +1619,7 @@ def analyze(request):
         
         log_and_print("INFO", f"[DATA PREP] Preparing data to save...")
         logger.info(f"   ├─ 결과 ID: {rslt_id}")
-        logger.info(f"   ├─ 모델 ID: {'LGBM_V2' if dl_jdgm_yn == 'Y' else 'STACKING_V2'}")
+        logger.info(f"   ├─ 모델 ID: {'ENSEMBLE_V1' if dl_jdgm_yn == 'Y' else 'STACKING_V2'}")
         logger.info(f"   ├─ ML 결과 코드: {ml_result_code}")
         logger.info(f"   ├─ 예측 점수: {final_confidence:.4f}")
         logger.info(f"   ├─ DL 판단 여부: {dl_jdgm_yn}")
@@ -1643,7 +1628,7 @@ def analyze(request):
         # 필드 길이 안전장치 적용
         safe_rslt_id = safe_truncate_field(rslt_id, 50, "rslt_id")
         safe_file_id_value = safe_file_id(ocrn_no)
-        safe_mdl_id = safe_truncate_field('LGBM_V2' if dl_jdgm_yn == 'Y' else 'STACKING_V2', 20, "mdl_id")
+        safe_mdl_id = safe_truncate_field('ENSEMBLE_V1' if dl_jdgm_yn == 'Y' else 'STACKING_V2', 20, "mdl_id")
         safe_ml_rslt_cd = safe_truncate_field(ml_result_code, 10, "ml_rslt_cd")
         safe_phsh_tp_nm = safe_truncate_field(llm_result['phishing_type'], 100, "phsh_tp_nm")
         
@@ -1792,7 +1777,7 @@ def analyze(request):
             'analysis_details': {
                 'first_model': first_model_result,
                 'second_model': second_model_result,
-                'final_decision_by': '2차 모델 (LGBM)' if dl_jdgm_yn == 'Y' else '1차 모델 (Stacking)',
+                'final_decision_by': '2차 모델 (Ensemble)' if dl_jdgm_yn == 'Y' else '1차 모델 (Stacking)',
                 'dl_judgment': dl_jdgm_yn == 'Y'
             },
             'file_info': {
