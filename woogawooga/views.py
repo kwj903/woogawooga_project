@@ -1452,7 +1452,7 @@ def analyze(request):
         )
         
         log_and_print("INFO", "[SUCCESS] ProcessdFile Record Created")
-        log_and_print("INFO", f"   Generated Record ID: {processed_file.id}")
+        log_and_print("INFO", f"   Generated Record ID: {processed_file.pk}")
         
         # 5단계: 1차 모델 분석 (진행률 업데이트)
         print_separator()
@@ -1839,7 +1839,7 @@ def analyze(request):
             SystemLog.objects.create(
                 level='ERROR',
                 message=f'[{error_type}] {error_message}',
-                file_name=locals().get('audio_file', {}).get('name', 'UNKNOWN') if 'audio_file' in locals() else 'UNKNOWN',
+                file_name=getattr(locals().get('audio_file'), 'name', 'UNKNOWN') if 'audio_file' in locals() else 'UNKNOWN',
                 ip_address=client_ip
             )
         except Exception as log_error:
