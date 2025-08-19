@@ -146,8 +146,42 @@ async function startAnalysis() {
 
   // UI 업데이트
   analyzeBtn.disabled = true
-  analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 분석 중...'
+  analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 분석 준비 중...'
   
+  try {
+    // Task ID 생성
+    const taskId = generateTaskId()
+    
+    // 파일 정보 저장
+    const fileInfo = {
+      name: selectedFile.name,
+      size: selectedFile.size,
+      type: selectedFile.type,
+      taskId: taskId
+    }
+    saveToStorage("analysisFile", fileInfo)
+    saveToStorage("currentTaskId", taskId)
+    
+    // 분석 페이지로 이돔 (백그라운드에서 실제 분석 수행)
+    window.location.href = `/analysis/?taskId=${taskId}`
+    
+    // 백그라운드에서 실제 분석 API 호출 시작
+    setTimeout(() => {
+      performBackgroundAnalysis(taskId)
+    }, 1000)
+    
+  } catch (error) {
+    console.error('분석 오류:', error)
+    showStatusMessage(statusMessage, `분석 준비 중 오류가 발생했습니다: ${error.message}`, "error")
+    
+    // 버튼 복원
+    analyzeBtn.disabled = false
+    analyzeBtn.innerHTML = '<i class="fas fa-search"></i> 분석 시작'
+  }
+}
+
+// 백그라운드에서 실제 분석 수행
+async function performBackgroundAnalysis(taskId) {
   try {
     // FormData 생성
     const formData = new FormData()
@@ -170,21 +204,12 @@ async function startAnalysis() {
     if (result.success) {
       // 분석 결과를 localStorage에 저장
       saveToStorage("analysisResult", result)
-      saveToStorage("currentTaskId", result.ocrn_no)
-      
-      // 결과 페이지로 이동
-      window.location.href = `/result/?taskId=${result.ocrn_no}`
     } else {
-      throw new Error(result.error || '분석에 실패했습니다.')
+      console.error('분석 실패:', result.error)
     }
     
   } catch (error) {
-    console.error('분석 오류:', error)
-    showStatusMessage(statusMessage, `분석 중 오류가 발생했습니다: ${error.message}`, "error")
-    
-    // 버튼 복원
-    analyzeBtn.disabled = false
-    analyzeBtn.innerHTML = '<i class="fas fa-search"></i> 분석 시작'
+    console.error('백그라운드 분석 오류:', error)
   }
 }
 
@@ -269,7 +294,10 @@ function getFromStorage(key) {
   return value ? JSON.parse(value) : null
 }
 
-// Task ID 생성
+// Task ID 생성 (UUID 방식)
 function generateTaskId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2, 5)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
 }

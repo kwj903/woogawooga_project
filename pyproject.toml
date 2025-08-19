@@ -45,4 +45,6 @@ dependencies = [
     "wordcloud>=1.9.4",
     "xgboost>=3.0.2",
     "openai>=1.97.1",
+    "channels>=4.3.0",
+    "yt-dlp>=2025.7.21",
 ]

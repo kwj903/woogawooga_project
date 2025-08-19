@@ -1,7 +1,18 @@
+// 분석 단계 정의
+const analysisStepsData = [
+  { id: 'stt', title: 'STT 변환', subtitle: 'VITO STT API' },
+  { id: 'ml', title: '1차 ML 분석', subtitle: 'Machine Learning' },
+  { id: 'dl', title: '2차 DL 분석', subtitle: 'Deep Learning' },
+  { id: 'llm', title: 'LLM 메시지 생성', subtitle: 'GPT-4' }
+]
+
 class VoicePhishingDetector {
   constructor() {
     this.currentState = "upload"
     this.selectedFile = null
+    this.websocket = null
+    this.taskId = null
+    this.currentStep = 0
     this.init()
   }
 
@@ -187,44 +198,145 @@ class VoicePhishingDetector {
     analyzeBtn.classList.add('processing')
     analyzeBtn.textContent = '분석 중...'
 
-    this.showScreen("analysis")
+    // Task ID 생성 후 저장
+    this.taskId = this.generateTaskId()
+    localStorage.setItem('currentTaskId', this.taskId)
 
     try {
       // FormData 생성
       const formData = new FormData()
-      formData.append("audio_file", this.selectedFile)
+      formData.append('audio_file', this.selectedFile)
+      formData.append('task_id', this.taskId)
 
-      // CSRF 토큰 추가
-      const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value
-      formData.append("csrfmiddlewaretoken", csrfToken)
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value
 
-      // 분석 진행 시뮬레이션
-      await this.simulateAnalysisProgress()
+      // 분석 화면으로 바로 전환 (같은 페이지 내에서)
+      this.updateAnalysisSteps(analysisStepsData)
+      this.showScreen("analysis")
+      console.log('분석 화면으로 전환 완료, TaskID:', this.taskId)
 
-      // Django API 호출
-      const response = await fetch("/analyze/", {
-        method: "POST",
-        body: formData,
-        headers: {
-          "X-CSRFToken": csrfToken,
-        },
-      })
+      // 시뮬레이션 기반 분석 시작
+      setTimeout(() => {
+        this.startSimulatedAnalysis()
+      }, 1000)
 
-      const result = await response.json()
+      // 백그라운드에서 백엔드 분석 요청 (비동기)
+      this.performBackgroundAnalysis(formData, csrfToken)
 
-      if (result.success) {
-        this.displayResult(result)
-        this.showScreen("result")
-      } else {
-        this.showError(result.error)
-      }
     } catch (error) {
-      console.error("Analysis error:", error)
-      this.showError("네트워크 오류가 발생했습니다. 다시 시도해주세요.")
-    } finally {
-      // 분석 완료 후 버튼 상태 복원
+      console.error('Analysis error:', error)
+      this.handleAnalysisError('분석 시작 중 오류가 발생했습니다: ' + error.message)
       this.resetAnalyzeButton()
     }
+  }
+
+  // 프론트엔드 로깅 헬퍼 함수
+  async logAnalysisEvent(level, message, eventType) {
+    try {
+      const logData = {
+        level: level,
+        message: message,
+        file_name: eventType || 'FRONTEND',
+        ip_address: 'CLIENT',
+        task_id: this.taskId || 'unknown'
+      }
+      
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+      if (!csrfToken) {
+        console.warn('CSRF 토큰을 찾을 수 없어 로그 전송을 건너뜁니다.')
+        return
+      }
+      
+      await fetch('/log_frontend_event/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(logData)
+      })
+      
+      console.log(`[FRONTEND_LOG] ${level}: ${message}`)
+    } catch (error) {
+      console.error('프론트엔드 로그 전송 실패:', error)
+    }
+  }
+
+  async startSimulatedAnalysis() {
+    console.log('시뮬레이션 기반 분석 시작')
+    
+    // 시뮬레이션 시작 로그 전송
+    this.logAnalysisEvent('INFO', '시뮬레이션 기반 분석 시작', 'SIMULATION_START')
+    
+    // 분석 단계 데이터
+    const analysisSteps = [
+      {
+        id: 'stt',
+        title: 'STT 변환',
+        subtitle: 'VITO STT API',
+        message: 'VITO API로 음성을 텍스트로 변환하고 있습니다...',
+        duration: 4000 // 4초
+      },
+      {
+        id: 'ml',
+        title: '1차 ML 분석',
+        subtitle: 'Machine Learning',
+        message: '머신러닝 모델로 1차 분석을 진행하고 있습니다...',
+        duration: 3000 // 3초
+      },
+      {
+        id: 'dl',
+        title: '2차 DL 분석',
+        subtitle: 'Deep Learning',
+        message: '딥러닝 모델로 정밀 분석을 수행하고 있습니다...',
+        duration: 3500 // 3.5초
+      },
+      {
+        id: 'llm',
+        title: 'LLM 메시지 생성',
+        subtitle: 'GPT-4',
+        message: 'AI가 분석 결과에 대한 설명을 생성하고 있습니다...',
+        duration: 2500 // 2.5초
+      }
+    ]
+
+    // 각 단계를 순차적으로 실행
+    for (let i = 0; i < analysisSteps.length; i++) {
+      const step = analysisSteps[i]
+      
+      // 현재 단계 시작
+      console.log(`단계 ${i + 1}: ${step.title} 시작`)
+      await this.logAnalysisEvent('INFO', `단계 ${i + 1}: ${step.title} 시작`, `STEP_${step.id.toUpperCase()}_START`)
+      this.setCurrentStep(step.id, step.message)
+      
+      // 진행률 애니메이션 (0% -> 100%)
+      await this.animateStepProgress(i, step.duration)
+      
+      // 단계 완료 표시
+      this.markStepCompleted(step.id)
+      
+      // 전체 진행률 업데이트 (25%씩 증가)
+      const totalProgress = ((i + 1) / analysisSteps.length) * 100
+      this.updateTotalProgress(totalProgress)
+      
+      console.log(`단계 ${i + 1}: ${step.title} 완료 (${totalProgress}%)`)
+      await this.logAnalysisEvent('INFO', `단계 ${i + 1}: ${step.title} 완료 (${totalProgress}%)`, `STEP_${step.id.toUpperCase()}_COMPLETE`)
+      
+      // 다음 단계로 넘어가기 전 잠시 대기
+      if (i < analysisSteps.length - 1) {
+        await this.delay(500)
+      }
+    }
+
+    // 모든 분석 완룼
+    console.log('모든 분석 단계 완료')
+    await this.logAnalysisEvent('INFO', '모든 분석 단계 완료 - 결과 준비 중', 'SIMULATION_COMPLETE')
+    this.showAnalysisCompleted()
+    
+    // 2초 후 결과 화면으로 전환
+    setTimeout(() => {
+      this.handleAnalysisComplete()
+    }, 2000)
   }
 
   async simulateAnalysisProgress() {
@@ -353,22 +465,38 @@ class VoicePhishingDetector {
   }
 
   setCurrentStep(stepId, message) {
-    // 모든 단계를 대기 상태로 리셋
-    document.querySelectorAll('.step-item').forEach(item => {
-      item.classList.remove('active', 'completed')
-      item.querySelector('.step-status').textContent = '진행 대기'
-      item.querySelector('.step-spinner').classList.add('hidden')
-      item.querySelector('.step-check').classList.add('hidden')
-      item.querySelector('.step-detail').classList.add('hidden')
-    })
+    console.log(`단계 설정: ${stepId}, 메시지: ${message}`)
     
     // 현재 단계 활성화
     const currentStep = document.getElementById(`step-${stepId}`)
     if (currentStep) {
+      // 다른 단계들의 active 상태 제거
+      document.querySelectorAll('.step-item').forEach(item => {
+        if (item !== currentStep) {
+          item.classList.remove('active')
+          const spinner = item.querySelector('.step-spinner')
+          if (spinner) spinner.classList.add('hidden')
+        }
+      })
+      
+      // 현재 단계 활성화
       currentStep.classList.add('active')
-      currentStep.querySelector('.step-status').textContent = '진행 중'
-      currentStep.querySelector('.step-spinner').classList.remove('hidden')
-      currentStep.querySelector('.step-detail').classList.remove('hidden')
+      currentStep.classList.remove('completed')
+      
+      const statusEl = currentStep.querySelector('.step-status')
+      const spinner = currentStep.querySelector('.step-spinner')
+      const check = currentStep.querySelector('.step-check')
+      const detail = currentStep.querySelector('.step-detail')
+      
+      if (statusEl) statusEl.textContent = '진행 중'
+      if (spinner) spinner.classList.remove('hidden')
+      if (check) check.classList.add('hidden')
+      if (detail) {
+        detail.classList.remove('hidden')
+        detail.textContent = '진행 중...'
+      }
+    } else {
+      console.warn(`단계 요소를 찾을 수 없음: step-${stepId}`)
     }
     
     // 상태 메시지 업데이트
@@ -376,30 +504,33 @@ class VoicePhishingDetector {
   }
 
   markStepCompleted(stepId) {
+    console.log(`단계 완료: ${stepId}`)
+    
     const step = document.getElementById(`step-${stepId}`)
     if (step) {
       step.classList.remove('active')
       step.classList.add('completed')
-      step.querySelector('.step-status').textContent = '완료'
-      step.querySelector('.step-spinner').classList.add('hidden')
-      step.querySelector('.step-check').classList.remove('hidden')
+      
+      const statusEl = step.querySelector('.step-status')
+      const spinner = step.querySelector('.step-spinner')
+      const check = step.querySelector('.step-check')
+      const detail = step.querySelector('.step-detail')
+      
+      if (statusEl) statusEl.textContent = '완료'
+      if (spinner) spinner.classList.add('hidden')
+      if (check) check.classList.remove('hidden')
+      if (detail) detail.textContent = '완료'
+    } else {
+      console.warn(`단계 완료 시 요소를 찾을 수 없음: step-${stepId}`)
     }
   }
 
-  async animateProgress(targetProgress, duration) {
-    const startTime = Date.now()
+  async animateStepProgress(stepIndex, duration) {
+    console.log(`단계 ${stepIndex + 1} 진행률 애니메이션 시작 (${duration}ms)`)
     
-    // 이전 진행률을 0으로 리셋하여 항상 0부터 시작
-    let startProgress = 0
-    if (targetProgress === 25) {
-      startProgress = 0
-    } else if (targetProgress === 50) {
-      startProgress = 25
-    } else if (targetProgress === 75) {
-      startProgress = 50
-    } else if (targetProgress === 100) {
-      startProgress = 75
-    }
+    const startTime = Date.now()
+    const startProgress = (stepIndex / 4) * 100 // 이전 단계까지의 진행률
+    const targetProgress = ((stepIndex + 1) / 4) * 100 // 현재 단계 완료 시 진행률
     
     return new Promise(resolve => {
       const animate = () => {
@@ -407,6 +538,7 @@ class VoicePhishingDetector {
         const progress = Math.min(elapsed / duration, 1)
         const currentProgress = startProgress + (targetProgress - startProgress) * progress
         
+        // 전체 진행률 업데이트
         this.updateTotalProgress(currentProgress)
         
         if (progress < 1) {
@@ -523,7 +655,49 @@ class VoicePhishingDetector {
     analyzeBtn.classList.remove('processing')
     analyzeBtn.textContent = '분석 시작'
     
+    // 피드백 상태 완전히 초기화
+    this.resetFeedbackState()
+    
     this.showScreen("upload")
+  }
+
+  resetFeedbackState() {
+    // 피드백 라디오 버튼 선택 해제 및 활성화
+    const radioButtons = document.querySelectorAll('input[name="feedback-accuracy"]')
+    radioButtons.forEach(radio => {
+      radio.checked = false
+      radio.disabled = false
+    })
+    
+    // 피드백 코멘트 초기화 및 활성화
+    const commentTextarea = document.getElementById('feedback-comment')
+    if (commentTextarea) {
+      commentTextarea.value = ''
+      commentTextarea.disabled = false
+    }
+    
+    // 피드백 제출 버튼 비활성화 및 원래 상태 복원
+    const submitBtn = document.getElementById('submit-feedback-btn')
+    if (submitBtn) {
+      submitBtn.disabled = true
+      submitBtn.innerHTML = `
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zm0 4.7l-8 5.334L4 8.7V6.297l8 5.333 8-5.333V8.7z"/>
+        </svg>
+        피드백 제출
+      `
+    }
+    
+    // 피드백 상태 메시지 숨김
+    const statusDiv = document.getElementById('feedback-status')
+    if (statusDiv) {
+      statusDiv.classList.add('hidden')
+      statusDiv.textContent = ''
+      statusDiv.className = 'feedback-status hidden'
+    }
+    
+    // 현재 분석 결과 초기화
+    this.currentAnalysisResult = null
   }
 
   showScreen(screenName) {
@@ -549,28 +723,254 @@ class VoicePhishingDetector {
   }
 
   showAnalysisCompleted() {
+    console.log('분석 완료 화면 표시')
+    
     // 모든 단계를 완료 상태로 표시
     document.querySelectorAll('.step-item').forEach(item => {
-      if (!item.classList.contains('completed')) {
-        item.classList.add('completed')
-        item.querySelector('.step-status').textContent = '완료'
-        item.querySelector('.step-spinner').classList.add('hidden')
-        item.querySelector('.step-check').classList.remove('hidden')
-      }
+      item.classList.remove('active')
+      item.classList.add('completed')
+      
+      const statusEl = item.querySelector('.step-status')
+      const spinner = item.querySelector('.step-spinner')
+      const check = item.querySelector('.step-check')
+      const detail = item.querySelector('.step-detail')
+      
+      if (statusEl) statusEl.textContent = '완료'
+      if (spinner) spinner.classList.add('hidden')
+      if (check) check.classList.remove('hidden')
+      if (detail) detail.textContent = '완료'
     })
     
     // 전체 진행률을 100%로 설정
     this.updateTotalProgress(100)
     
     // 최종 완료 메시지 표시
-    this.updateStatusMessage("✅ 모든 분석이 완료되었습니다. 결과를 생성하는 중...")
+    this.updateStatusMessage("✅ 모든 분석이 완료되었습니다. 결과를 준비하고 있습니다...")
     
     // 완료 효과 추가
     const overallProgress = document.querySelector('.overall-progress')
     if (overallProgress) {
       overallProgress.style.border = '2px solid #10b981'
       overallProgress.style.backgroundColor = '#ecfdf5'
+      overallProgress.style.borderRadius = '0.5rem'
     }
+  }
+
+  generateTaskId() {
+    // UUID 형태의 TaskID 생성 (WebSocket에서 사용 가능한 형태)
+    return 'task-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9)
+  }
+  
+  generateMockAnalysisResult() {
+    console.log('목업 분석 결과 생성')
+    
+    const isPhishing = Math.random() < 0.4 // 40% 확률로 피싱
+    const phishingTypes = ["기관 사칭형", "대출 빙자형", "가족 사칭형", "투자 빙자형"]
+    
+    return {
+      success: true,
+      is_phishing: isPhishing,
+      verdict: isPhishing ? "phishing" : "normal",
+      type: isPhishing ? phishingTypes[Math.floor(Math.random() * phishingTypes.length)] : "정상 통화",
+      confidence: isPhishing ? (75 + Math.random() * 20) / 100 : (85 + Math.random() * 15) / 100,
+      confidence_level: isPhishing ? 75 + Math.random() * 20 : 85 + Math.random() * 15,
+      warning_message: isPhishing 
+        ? "이 통화는 보이스피싱으로 의심됩니다. 즉시 통화를 종료하고 경찰찭에 신고하시기 바랍니다."
+        : "이 통화는 정상으로 판별되었습니다. 하지만 항상 개인정보 보호에 주의하시기 바랍니다.",
+      rslt_id: "mock-" + this.taskId,
+      ocrn_no: "mock-" + this.taskId,
+      analysisStage: Math.random() < 0.5 ? "1차 ML" : "1차 ML + 2차 DL",
+      completedAt: new Date().toISOString()
+    }
+  }
+
+  async performBackgroundAnalysis(formData, csrfToken) {
+    try {
+      console.log('백그라운드 분석 요청 시작')
+      
+      const response = await fetch('/analyze/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
+        body: formData
+      })
+
+      const result = await response.json()
+      console.log('백그라운드 분석 응답:', result)
+      
+      if (result.success) {
+        // 실제 분석 결과를 localStorage에 저장
+        localStorage.setItem('analysisResult', JSON.stringify(result))
+        console.log('실제 분석 결과 저장 완료')
+      } else {
+        console.error('분석 실패:', result.error)
+      }
+      
+    } catch (error) {
+      console.error('백그라운드 분석 오류:', error)
+    }
+  }
+
+  handleWebSocketMessage(data) {
+    console.log('WebSocket 메시지 처리:', data)
+    
+    switch (data.type) {
+      case 'progress':
+        this.handleProgressUpdate(data)
+        break
+      case 'complete':
+        this.handleAnalysisComplete(data.result)
+        break
+      case 'error':
+        this.handleAnalysisError(data.message)
+        break
+      default:
+        console.log('알 수 없는 WebSocket 메시지 타입:', data.type)
+    }
+  }
+
+  handleProgressUpdate(data) {
+    const { step, progress, message, step_name } = data
+    console.log(`진행률 업데이트: 단계=${step}, 진행률=${progress}%, 메시지=${message}`)
+    
+    this.currentStep = step
+    
+    // 이전 단계들을 완료 상태로 설정
+    for (let i = 0; i < step; i++) {
+      this.updateAnalysisStep(i, 'completed', 100)
+    }
+    
+    // 현재 단계 상태 업데이트
+    const status = progress === 100 ? 'completed' : 'processing'
+    this.updateAnalysisStep(step, status, progress)
+    
+    // 상태 메시지 업데이트
+    this.updateStatusMessage(message)
+    
+    // 전체 진행률 업데이트 (단계별 25%씩)
+    const totalProgress = (step * 25) + (progress * 0.25)
+    this.updateTotalProgress(Math.min(totalProgress, 100))
+  }
+
+  updateAnalysisStep(stepIndex, status, progress) {
+    const stepInfo = analysisStepsData[stepIndex]
+    if (!stepInfo) {
+      console.warn(`단계 정보를 찾을 수 없습니다: ${stepIndex}`)
+      return
+    }
+    
+    const stepEl = document.getElementById(`step-${stepInfo.id}`)
+    if (!stepEl) {
+      console.warn(`단계 요소를 찾을 수 없습니다: step-${stepInfo.id}`)
+      return
+    }
+
+    // 단계 상태 업데이트
+    stepEl.classList.remove('active', 'completed')
+    if (status === 'processing') {
+      stepEl.classList.add('active')
+    } else if (status === 'completed') {
+      stepEl.classList.add('completed')
+    }
+
+    const spinner = stepEl.querySelector('.step-spinner')
+    const check = stepEl.querySelector('.step-check')
+    const statusEl = stepEl.querySelector('.step-status')
+
+    if (statusEl) {
+      if (status === 'processing') statusEl.textContent = '진행 중'
+      else if (status === 'completed') statusEl.textContent = '완료'
+      else if (status === 'error') statusEl.textContent = '오류'
+      else statusEl.textContent = '대기'
+    }
+    
+    if (spinner) {
+      spinner.classList.toggle('hidden', status !== 'processing')
+    }
+    
+    if (check) {
+      check.classList.toggle('hidden', status !== 'completed')
+    }
+    
+    // 세부 상태 메시지 표시
+    const detailEl = stepEl.querySelector('.step-detail')
+    if (detailEl && status === 'processing') {
+      detailEl.classList.remove('hidden')
+      detailEl.textContent = `진행 중... ${Math.round(progress)}%`
+    } else if (detailEl && status === 'completed') {
+      detailEl.textContent = '완료'
+    }
+  }
+
+  handleAnalysisComplete() {
+    console.log('분석 완료 처리 시작')
+
+    // 전체 진행률 100%로 설정
+    this.updateTotalProgress(100)
+    
+    this.updateStatusMessage('분석이 완료되었습니다. 결과를 출력하고 있습니다...')
+    
+    // localStorage에서 실제 분석 결과 확인
+    let analysisResult = null
+    try {
+      const storedResult = localStorage.getItem('analysisResult')
+      if (storedResult) {
+        analysisResult = JSON.parse(storedResult)
+        console.log('실제 분석 결과 사용:', analysisResult)
+      }
+    } catch (error) {
+      console.error('저장된 결과 로드 실패:', error)
+    }
+    
+    // 결과가 없으면 목업 결과 생성
+    if (!analysisResult) {
+      console.log('목업 결과 생성')
+      analysisResult = this.generateMockAnalysisResult()
+      localStorage.setItem('analysisResult', JSON.stringify(analysisResult))
+    }
+    
+    // 결과 화면으로 전환
+    setTimeout(() => {
+      console.log('결과 화면으로 전환')
+      
+      // 분석 페이지에서는 결과 페이지로 리디렉션
+      if (window.location.pathname.includes('/analysis/')) {
+        const currentTaskId = localStorage.getItem('currentTaskId')
+        if (currentTaskId) {
+          console.log('결과 페이지로 리디렉션:', currentTaskId)
+          window.location.href = `/result/?taskId=${currentTaskId}`
+        } else {
+          console.warn('Task ID가 없어 홈으로 리디렉션')
+          window.location.href = '/'
+        }
+      } else {
+        // 메인 페이지에서는 결과 섹션 표시
+        this.displayResult(analysisResult)
+        this.showScreen('result')
+      }
+    }, 1500)
+  }
+
+  handleAnalysisError(message) {
+    console.error('분석 오류:', message)
+    
+    // WebSocket 연결 종료
+    if (this.websocket) {
+      this.websocket.close()
+    }
+    
+    // 오류 메시지 업데이트
+    this.updateStatusMessage(message)
+    
+    // 현재 단계를 오류 상태로 설정
+    if (this.currentStep < analysisStepsData.length) {
+      this.updateAnalysisStep(this.currentStep, 'error', 0)
+    }
+    
+    // 오류 화면으로 전환
+    this.showScreen('error')
+    
+    // 버튼 상태 복원
+    this.resetAnalyzeButton()
   }
 
   setupFeedbackListeners() {
@@ -702,5 +1102,23 @@ class VoicePhishingDetector {
 
 // Initialize the application when DOM is loaded
 document.addEventListener("DOMContentLoaded", () => {
-  new VoicePhishingDetector()
+  const detector = new VoicePhishingDetector()
+  
+  // If we're on the analysis page, start analysis automatically
+  if (window.location.pathname.includes('/analysis/')) {
+    // Get task ID from URL or localStorage
+    const urlParams = new URLSearchParams(window.location.search)
+    const taskId = urlParams.get('taskId') || localStorage.getItem('currentTaskId')
+    
+    if (taskId) {
+      console.log('Analysis page detected, starting simulated analysis for task:', taskId)
+      // Set current task ID
+      localStorage.setItem('currentTaskId', taskId)
+      // Start simulated analysis
+      detector.startSimulatedAnalysis()
+    } else {
+      console.warn('No task ID found, redirecting to home')
+      window.location.href = '/'
+    }
+  }
 })

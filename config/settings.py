@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "channels",
 ]
 
 MIDDLEWARE = [
@@ -110,7 +111,25 @@ DATABASES = {
         },
     }
 }
+# 구글 클라우드 디비 설정
+# import os
+# from dotenv import load_dotenv
 
+# load_dotenv()  # Codex에선 무시되고, 로컬에서만 동작
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': os.getenv('DB_NAME'),
+#         'USER': os.getenv('DB_USER'),
+#         'PASSWORD': os.getenv('DB_PASSWORD'),
+#         'HOST': os.getenv('DB_HOST'),
+#         'PORT': os.getenv('DB_PORT'),
+#         'OPTIONS': {
+#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+#         }
+#     }
+# }
 
 
 # Password validation
@@ -162,3 +181,114 @@ VITO_API_URL = 'https://openapi.vito.ai/v1'
 # OpenAI API 설정 (백업용)
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 GPT_API_KEY = os.getenv('GPT_API_KEY')
+
+
+
+# Channels 설정
+ASGI_APPLICATION = 'config.asgi.application'
+
+# Channel Layer 설정 (개발용 - In-Memory)
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
+    }
+}
+
+# Channels 설정
+ASGI_APPLICATION = "config.asgi.application"
+
+# Channel Layer 설정 (개발용 - In-Memory)
+CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+
+# 로깅 설정 - 터미널과 파일에 로그 출력을 위한 단순화된 설정
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+    },
+    "handlers": {
+        "console": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+        "file": {
+            "level": "DEBUG",
+            "class": "logging.FileHandler",
+            "filename": BASE_DIR / "logs" / "woogawooga.log",
+            "formatter": "verbose",
+            "encoding": "utf-8",
+        },
+    },
+    # 모든 로거의 최상위인 root 로거를 설정합니다.
+    # 이렇게 하면 Django와 woogawooga 앱을 포함한 모든 로그가 이 설정을 따릅니다.
+    "root": {
+        "handlers": ["console", "file"],
+        "level": "INFO",
+    },
+    # 특정 앱의 로그 레벨만 조정하고 싶을 때 아래처럼 추가할 수 있습니다.
+    "loggers": {
+        "django": {
+            # django 관련 로그가 너무 많이 보인다면 레벨을 'WARNING'으로 조정하세요.
+            "level": "INFO",
+            "handlers": ["console", "file"],
+            "propagate": False,  # root 로거로 전파하지 않아 중복 출력을 막습니다.
+        },
+    },
+}
+
+
+# 로깅 설정 - 터미널에 실시간 로그 출력을 위한 설정
+# LOGGING = {
+#     "version": 1,
+#     "disable_existing_loggers": False,
+#     "formatters": {
+#         "verbose": {
+#             "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s",
+#             "datefmt": "%Y-%m-%d %H:%M:%S",
+#         },
+#         "simple": {
+#             "format": "[%(levelname)s] %(message)s",
+#         },
+#     },
+#     "handlers": {
+#         "console": {
+#             "level": "INFO",  # 개발 중에는 'DEBUG'로 설정하여 더 상세한 정보 확인 가능
+#             "class": "logging.StreamHandler",
+#             "formatter": "verbose",
+#             "stream": "ext://sys.stdout",  # UTF-8 인코딩을 위한 설정
+#         },
+#         "file": {
+#             "level": "DEBUG",
+#             "class": "logging.FileHandler",
+#             "filename": BASE_DIR / "logs" / "woogawooga.log",
+#             "formatter": "verbose",
+#             "encoding": "utf-8",  # UTF-8 인코딩 명시적 설정
+#         },
+#     },
+#     "loggers": {
+#         "django": {
+#             "handlers": ["console"],
+#             "level": "INFO",
+#             "propagate": False,
+#         },
+#         "woogawooga": {  # 우리 앱을 위한 로거
+#             "handlers": ["console", "file"],
+#             "level": "INFO",
+#             "propagate": True,  # 하위 로거들이 상위로 전파되도록 설정
+#         },
+#         "woogawooga.views": {  # views 모듈 전용 로거
+#             "handlers": ["console", "file"],
+#             "level": "INFO",
+#             "propagate": False,
+#         },
+#         "": {  # 루트 로거 - 모든 로그를 캐치
+#             "handlers": ["console"],
+#             "level": "INFO",
+#         },
+#     },
+# }

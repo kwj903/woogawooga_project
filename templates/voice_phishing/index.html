@@ -8,7 +8,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>woogawooga</title>
+    <title>WOOGAWOOGA</title>
     <link rel="stylesheet" href="{% static 'voice_phishing/css/style.css' %}">
 </head>
 <body>
@@ -32,7 +32,7 @@
             <!-- Upload Screen -->
             <div id="upload-screen" class="card">
                 <div class="card-header">
-                    <h2 class="card-title">woogawooga</h2>
+                    <h2 class="card-title">보이스피싱 판별 시스템</h2>
                     <p class="card-description">음성 파일 업로드</p>
                 </div>
                 <div class="card-content">
@@ -43,7 +43,7 @@
                             </svg>
                             <span class="section-title">음성 파일 업로드</span>
                         </div>
-                        <p class="file-formats">※ 지원 포맷: AMR, MP3, WAV, M4A</p>
+                        <p class="file-formats">※ 지원 포맷: AMR, MP3, WAV, M4A (최대파일용량: 50MB)</p>
                         
                         <form id="upload-form" enctype="multipart/form-data">
                             {% csrf_token %}
